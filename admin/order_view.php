@@ -158,7 +158,7 @@ require __DIR__ . '/../includes/admin_header.php';
       </div>
     </div>
 
-    <div style="margin-top:36px;display:grid;grid-template-columns:1.1fr 0.9fr;gap:28px;">
+    <div class="admin-two-col" style="margin-top:36px;">
       <div>
         <h2 style="font-size:1.4rem;font-weight:900;text-transform:uppercase;margin-bottom:16px;">Update / Track</h2>
         <form method="post">

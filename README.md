@@ -24,6 +24,29 @@ Important:
 - Add a **Volume** at `/app/data` so orders/users survive redeploys.
 - Optional volume: `/app/assets/uploads` for uploaded images.
 
+### Custom domain + HTTPS (fix “Not secure”)
+
+Browsers show **Not secure** when the site is opened over plain `http://` or the SSL certificate is missing.
+
+Railway issues a free Let’s Encrypt certificate for custom domains automatically once DNS is correct.
+
+1. In Railway → your service → **Settings** → **Networking** → **Custom Domain**.
+2. Add `lalawearscraftedforstyle.com` (and `www` if you use it).
+3. In your DNS provider, add **both** records Railway shows:
+   - **CNAME** (or ALIAS / CNAME flattening for the root domain) → Railway target
+   - **TXT** verification record (required — without it SSL will not issue)
+4. Wait until Railway shows the domain as verified and the certificate as **Issued**.
+5. Open **`https://lalawearscraftedforstyle.com`** (not `http://`).
+6. Optional Railway variables (recommended):
+   - `APP_URL` = `https://lalawearscraftedforstyle.com`
+   - `FORCE_HTTPS` = `1` (default behaviour already redirects HTTP → HTTPS in production)
+
+If you use **Cloudflare**:
+- SSL/TLS mode = **Full** (not Flexible, not Full Strict)
+- During first certificate issue, set the orange cloud to **DNS only**, wait for Railway SSL, then turn proxy back on
+
+Also update Google OAuth redirect URIs to the `https://` domain if Google Sign-In is enabled.
+
 ## Customer login (Phone + OTP)
 
 1. Open `/auth/login.php`

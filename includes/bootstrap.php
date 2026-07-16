@@ -2,6 +2,10 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/config.php';
+
+// Production: always serve over HTTPS (Railway / custom domain)
+force_https_redirect();
+
 require_once __DIR__ . '/firewall.php';
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/db.php';

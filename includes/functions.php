@@ -172,6 +172,10 @@ function set_security_headers(): void
     header('X-Content-Type-Options: nosniff');
     header('Referrer-Policy: strict-origin-when-cross-origin');
     header("Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://lh3.googleusercontent.com https://*.googleusercontent.com; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.resend.com; frame-ancestors 'self';");
+    // Tell browsers to prefer HTTPS after the first secure visit
+    if (function_exists('request_is_https') && request_is_https() && !is_local_request_host()) {
+        header('Strict-Transport-Security: max-age=31536000; includeSubDomains; preload');
+    }
 }
 
 function notify_user(int $userId, string $title, string $message, string $link = ''): void

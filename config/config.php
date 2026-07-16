@@ -59,6 +59,10 @@ define('OTP_RESEND_SECONDS', 30);
 // Show OTP on verify page (dev / easy login). Set false in production.
 define('OTP_SHOW_ON_SITE', array_key_exists('OTP_SHOW_ON_SITE', $__local) ? (bool) $__local['OTP_SHOW_ON_SITE'] : true);
 
+// Canonical public URL (optional). Example: https://lalawearscraftedforstyle.com
+$__appUrl = getenv('APP_URL') ?: (string) ($__local['APP_URL'] ?? '');
+define('APP_URL', rtrim($__appUrl, '/'));
+
 define('SESSION_NAME', 'LALAWEARSSESSID');
 define('CSRF_TOKEN_KEY', '_csrf_token');
 define('LOGIN_MAX_ATTEMPTS', 5);
@@ -66,11 +70,87 @@ define('LOGIN_LOCK_MINUTES', 15);
 
 date_default_timezone_set('Asia/Kolkata');
 
+/**
+ * Detect HTTPS correctly behind Railway / Cloudflare / reverse proxies.
+ */
+function request_is_https(): bool
+{
+    if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+        return true;
+    }
+    if ((string) ($_SERVER['SERVER_PORT'] ?? '') === '443') {
+        return true;
+    }
+    $proto = strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
+    // May be a comma list: "https, http"
+    if ($proto !== '' && str_starts_with($proto, 'https')) {
+        return true;
+    }
+    $ssl = strtolower((string) ($_SERVER['HTTP_X_FORWARDED_SSL'] ?? ''));
+    if ($ssl === 'on' || $ssl === '1') {
+        return true;
+    }
+    return false;
+}
+
+function request_host(): string
+{
+    $host = (string) ($_SERVER['HTTP_X_FORWARDED_HOST'] ?? $_SERVER['HTTP_HOST'] ?? 'localhost:8080');
+    // First host if a list was forwarded
+    if (str_contains($host, ',')) {
+        $host = trim(explode(',', $host, 2)[0]);
+    }
+    return $host;
+}
+
+function is_local_request_host(?string $host = null): bool
+{
+    $host = strtolower($host ?? request_host());
+    $name = explode(':', $host, 2)[0];
+    return $name === 'localhost'
+        || $name === '127.0.0.1'
+        || $name === '::1'
+        || str_ends_with($name, '.local');
+}
+
+/**
+ * Force browsers onto HTTPS in production (fixes "Not secure" when visiting http://).
+ * Skip localhost. Set env FORCE_HTTPS=0 to disable.
+ */
+function force_https_redirect(): void
+{
+    if (PHP_SAPI === 'cli') {
+        return;
+    }
+    $flag = strtolower((string) (getenv('FORCE_HTTPS') ?: ''));
+    if ($flag === '0' || $flag === 'false' || $flag === 'off') {
+        return;
+    }
+    if (is_local_request_host()) {
+        return;
+    }
+    if (request_is_https()) {
+        return;
+    }
+    $uri = (string) ($_SERVER['REQUEST_URI'] ?? '/');
+    header('Location: https://' . request_host() . $uri, true, 301);
+    exit;
+}
+
 if (session_status() === PHP_SESSION_NONE) {
+    $secureCookie = request_is_https();
     ini_set('session.cookie_httponly', '1');
     ini_set('session.cookie_samesite', 'Lax');
+    ini_set('session.cookie_secure', $secureCookie ? '1' : '0');
     ini_set('session.use_strict_mode', '1');
     session_name(SESSION_NAME);
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'secure' => $secureCookie,
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
     session_start();
 }
 
@@ -103,11 +183,12 @@ function asset(string $path): string
 
 function app_absolute_url(string $path = ''): string
 {
-    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-        || (($_SERVER['SERVER_PORT'] ?? '') === '443');
-    $scheme = $https ? 'https' : 'http';
-    $host = $_SERVER['HTTP_HOST'] ?? 'localhost:8080';
-    return $scheme . '://' . $host . url($path);
+    // Optional override: APP_URL=https://lalawearscraftedforstyle.com
+    if (APP_URL !== '') {
+        return APP_URL . url($path);
+    }
+    $scheme = request_is_https() ? 'https' : 'http';
+    return $scheme . '://' . request_host() . url($path);
 }
 
 function google_configured(): bool

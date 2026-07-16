@@ -1,9 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.flash').forEach((el) => {
     setTimeout(() => {
+      // Only fixed (centered) flashes carry the translateX(-50%) transform.
+      const isFixed = getComputedStyle(el).position === 'fixed';
       el.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
       el.style.opacity = '0';
-      el.style.transform = 'translateX(-50%) translateY(-12px)';
+      el.style.transform = isFixed ? 'translateX(-50%) translateY(-12px)' : 'translateY(-8px)';
       setTimeout(() => el.remove(), 450);
     }, 4200);
   });
@@ -198,23 +200,40 @@ function initHeaderMenus() {
   }
 
   if (menuToggle && header) {
+    const closeMobileNav = () => {
+      header.classList.remove('mobile-nav-open');
+      document.body.classList.remove('nav-locked');
+      menuToggle.setAttribute('aria-expanded', 'false');
+    };
+
     menuToggle.addEventListener('click', (e) => {
       e.stopPropagation();
       const isOpen = header.classList.toggle('mobile-nav-open');
+      document.body.classList.toggle('nav-locked', isOpen);
       menuToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
     });
 
     navCenterLinks.forEach(link => {
-      link.addEventListener('click', () => {
-        header.classList.remove('mobile-nav-open');
-        if (menuToggle) menuToggle.setAttribute('aria-expanded', 'false');
-      });
+      link.addEventListener('click', closeMobileNav);
     });
 
     document.addEventListener('click', (e) => {
-      if (!header.contains(e.target)) {
-        header.classList.remove('mobile-nav-open');
-        if (menuToggle) menuToggle.setAttribute('aria-expanded', 'false');
+      if (!header.contains(e.target)) closeMobileNav();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeMobileNav();
+        if (dropdown && trigger) {
+          dropdown.classList.remove('active');
+          trigger.setAttribute('aria-expanded', 'false');
+        }
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 980 && header.classList.contains('mobile-nav-open')) {
+        closeMobileNav();
       }
     });
   }
@@ -251,9 +270,20 @@ function initJourneyLine() {
     });
   };
 
+  // Throttle scroll work with requestAnimationFrame so scrolling stays smooth
+  let ticking = false;
+  const requestUpdate = () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      update();
+      ticking = false;
+    });
+  };
+
   update();
-  window.addEventListener('scroll', update, { passive: true });
-  window.addEventListener('resize', update);
+  window.addEventListener('scroll', requestUpdate, { passive: true });
+  window.addEventListener('resize', requestUpdate);
 }
 
 function initGlowingEdgeCards() {
