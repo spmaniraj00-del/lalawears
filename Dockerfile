@@ -1,19 +1,20 @@
-FROM dunglas/frankenphp:1-php8.3
+FROM php:8.3-cli-bookworm
 
-# SQLite for the app database
-RUN install-php-extensions pdo_sqlite
+# SQLite (same as local)
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends libsqlite3-dev \
+	&& docker-php-ext-install pdo_sqlite \
+	&& rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-
 COPY . /app
 
-# Writable dirs for SQLite + uploads
 RUN mkdir -p /app/data /app/assets/uploads \
 	&& chmod -R 777 /app/data /app/assets/uploads
 
-# Railway injects PORT; Caddyfile binds to it
+# Railway sets PORT at runtime
 ENV PORT=8080
-
 EXPOSE 8080
 
-CMD ["frankenphp", "run", "--config", "/app/Caddyfile"]
+# Same as local: php -S ... router.php — bind to 0.0.0.0 for Railway
+CMD ["sh", "-c", "php -S 0.0.0.0:${PORT:-8080} -t /app /app/router.php"]
