@@ -525,6 +525,29 @@ html {
   font-weight: 600;
   color: var(--text-faint);
 }
+.otp-onsite-reset {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(228, 164, 189, 0.12);
+  border: 1px solid rgba(228, 164, 189, 0.45);
+  word-break: break-all;
+}
+.otp-onsite-label {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.otp-onsite-link {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 
 .recaptcha-wrap {
   display: flex;

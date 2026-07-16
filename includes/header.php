@@ -17,7 +17,7 @@ $searchQuery = trim((string) ($_GET['q'] ?? ''));
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=League+Spartan:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="<?= e(asset('css/style.css')) ?>?v=2.2">
+  <link rel="stylesheet" href="<?= e(asset('css/style.css')) ?>?v=2.3">
   <link rel="icon" href="<?= e(asset('images/log.png')) ?>">
 </head>
 <body class="<?= e($bodyClass) ?>">
@@ -128,11 +128,13 @@ $searchQuery = trim((string) ($_GET['q'] ?? ''));
         </div>
       </div>
 
-      <a class="nav-action" href="<?= e(url('index.php')) ?>#deals">
+      <a class="nav-action" href="<?= e(url('wishlist.php')) ?>">
         <span class="nav-action-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
           </svg>
+          <?php $wishCount = wishlist_count($user); ?>
+          <?php if ($wishCount > 0): ?><span class="badge-count"><?= $wishCount > 9 ? '9+' : $wishCount ?></span><?php endif; ?>
         </span>
         <span class="nav-action-label">Wishlist</span>
       </a>

@@ -31,6 +31,9 @@ function login_user(array $user): void
     $_SESSION['user_id'] = (int) $user['id'];
     $_SESSION['user_role'] = $user['role'];
     $_SESSION['login_at'] = time();
+    if (($user['role'] ?? '') === 'user') {
+        wishlist_merge_guest_into_user((int) $user['id']);
+    }
 }
 
 function logout_user(): void
@@ -391,44 +394,61 @@ function send_password_reset_link(string $email): array
     if ($email === '') {
         return ['ok' => false, 'error' => 'Email address is required.'];
     }
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return ['ok' => false, 'error' => 'Please enter a valid email address.'];
+    }
 
-    // Check if user exists
     $stmt = $pdo->prepare("SELECT * FROM users WHERE lower(email) = ? AND role = 'user' LIMIT 1");
     $stmt->execute([$email]);
     $user = $stmt->fetch();
 
+    // Same message whether or not the account exists (no email leak)
+    $genericOk = 'If your email is registered, you will receive a password reset link shortly.';
+
     if (!$user) {
-        // For security, don't leak if the user exists or not, but we can give a success message
-        return ['ok' => true, 'message' => 'If your email is registered, you will receive a password reset link shortly.'];
+        return ['ok' => true, 'message' => $genericOk, 'email_sent' => false];
     }
 
-    // Generate a secure random token
     $token = bin2hex(random_bytes(16));
-    $expires = date('Y-m-d H:i:s', time() + 15 * 60); // 15 mins expiry
+    $expires = date('Y-m-d H:i:s', time() + 15 * 60);
 
-    // Delete any existing tokens for this email
-    $pdo->prepare("DELETE FROM password_resets WHERE email = ?")->execute([$email]);
-
-    // Insert new token
-    $pdo->prepare("INSERT INTO password_resets (email, token, expires_at) VALUES (?, ?, ?)")
+    $pdo->prepare('DELETE FROM password_resets WHERE email = ?')->execute([$email]);
+    $pdo->prepare('INSERT INTO password_resets (email, token, expires_at) VALUES (?, ?, ?)')
         ->execute([$email, $token, $expires]);
 
-    // Send email using Resend
     $resetLink = app_absolute_url('auth/reset_password.php?token=' . $token);
     $subject = 'Reset Your Password - LALA WEARS';
     $html = '<div style="font-family:sans-serif; max-width:600px; margin:0 auto; padding:20px; border:1px solid #f0f0f0; border-radius:8px;">'
           . '<h2 style="color:#262626; text-transform:uppercase; letter-spacing:0.05em;">Reset Your Password</h2>'
-          . '<p style="color:#4a4a4a; font-size:15px; line-height:1.5;">You requested a password reset for your LALA WEARS account. Click the button below to set a new password. This link will expire in 15 minutes.</p>'
+          . '<p style="color:#4a4a4a; font-size:15px; line-height:1.5;">Hi ' . htmlspecialchars((string) $user['name']) . ', you requested a password reset for your LALA WEARS account. Click the button below to set a new password. This link expires in 15 minutes.</p>'
           . '<div style="margin:28px 0;"><a href="' . htmlspecialchars($resetLink) . '" style="background:#e4a4bd; color:#262626; text-decoration:none; padding:12px 28px; font-weight:bold; border-radius:999px; font-size:14px; letter-spacing:0.05em; display:inline-block;">RESET PASSWORD</a></div>'
-          . '<p style="color:#8a8a8a; font-size:12px; margin-top:30px;">If you did not request this, you can ignore this email. Your password will remain unchanged.</p>'
+          . '<p style="color:#8a8a8a; font-size:12px; word-break:break-all;">Or copy this link:<br>' . htmlspecialchars($resetLink) . '</p>'
+          . '<p style="color:#8a8a8a; font-size:12px; margin-top:30px;">If you did not request this, ignore this email.</p>'
           . '</div>';
 
-    $sent = resend_send_email($email, $subject, $html);
-    if (!$sent['ok']) {
-        return ['ok' => false, 'error' => $sent['error']];
+    $sent = ['ok' => false, 'error' => ''];
+    if (resend_configured()) {
+        $sent = resend_send_email($email, $subject, $html);
+    } else {
+        $sent = ['ok' => false, 'error' => 'Email service is not configured.'];
     }
 
-    return ['ok' => true, 'message' => 'If your email is registered, you will receive a password reset link shortly.'];
+    // Same as OTP: if on-site mode is on, always succeed and show the link on the page
+    if (!$sent['ok'] && !OTP_SHOW_ON_SITE) {
+        return ['ok' => false, 'error' => $sent['error'] !== '' ? $sent['error'] : 'Could not send reset email.'];
+    }
+
+    $message = !empty($sent['ok'])
+        ? 'Reset link sent to your email. Check inbox (and spam). Link expires in 15 minutes.'
+        : 'Could not reach your inbox right now — use the reset link below (valid 15 minutes).';
+
+    return [
+        'ok' => true,
+        'message' => $message,
+        'email_sent' => !empty($sent['ok']),
+        'show_on_site' => OTP_SHOW_ON_SITE,
+        'reset_link' => OTP_SHOW_ON_SITE ? $resetLink : '',
+    ];
 }
 
 function reset_user_password(string $token, string $password): array

@@ -265,6 +265,23 @@ function migrate_schema(PDO $pdo): void
     if (!isset($reviewCols['images'])) {
         $pdo->exec("ALTER TABLE reviews ADD COLUMN images TEXT DEFAULT ''");
     }
+
+    $productCols = table_columns($pdo, 'products');
+    if (!isset($productCols['images'])) {
+        $pdo->exec("ALTER TABLE products ADD COLUMN images TEXT DEFAULT ''");
+    }
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS wishlists (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            product_id INTEGER NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+            UNIQUE(user_id, product_id),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+        )
+    ");
 }
 
 function admin_exists(PDO $pdo): bool

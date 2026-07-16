@@ -141,12 +141,29 @@ function product_category(array $p): string
 
     <div class="deals-grid">
       <?php foreach ($products as $product): ?>
-        <?php $productUrl = url('product.php?id=' . (int) $product['id']); ?>
+        <?php
+          $productUrl = url('product.php?id=' . (int) $product['id']);
+          $gallery = product_gallery_paths($product);
+          $wished = wishlist_has((int) $product['id'], $user ?? null);
+        ?>
         <article class="deal-card reveal-up" data-category="<?= e(product_category($product)) ?>">
-          <a class="deal-media" href="<?= e($productUrl) ?>">
-            <img src="<?= e(product_image_url($product['image'])) ?>" alt="<?= e($product['name']) ?>" loading="lazy">
-            <span class="deal-tag">Premium</span>
-          </a>
+          <div class="deal-media-wrap">
+            <a class="deal-media" href="<?= e($productUrl) ?>" data-hover-slide>
+              <?php foreach ($gallery as $i => $imgPath): ?>
+                <img src="<?= e(product_image_url($imgPath)) ?>" alt="<?= e($product['name']) ?>" loading="lazy" class="<?= $i === 0 ? 'is-active' : '' ?>">
+              <?php endforeach; ?>
+              <span class="deal-tag">Premium</span>
+            </a>
+            <form method="post" action="<?= e(url('wishlist.php')) ?>" class="deal-wish-form">
+              <?= csrf_field() ?>
+              <input type="hidden" name="action" value="toggle">
+              <input type="hidden" name="product_id" value="<?= (int) $product['id'] ?>">
+              <input type="hidden" name="next" value="index.php#deals">
+              <button type="submit" class="deal-wish<?= $wished ? ' is-active' : '' ?>" aria-label="<?= $wished ? 'Remove from wishlist' : 'Add to wishlist' ?>">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="<?= $wished ? 'currentColor' : 'none' ?>" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+              </button>
+            </form>
+          </div>
           <div class="deal-body">
             <h3 class="deal-name"><a href="<?= e($productUrl) ?>"><?= e($product['name']) ?></a></h3>
             <p class="deal-desc"><?= e($product['description']) ?></p>

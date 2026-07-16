@@ -36,18 +36,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new RuntimeException('Price cannot be negative.');
         }
 
-        $imagePath = $product['image'] ?? '';
-        if (!empty($_FILES['image']['name'])) {
-            $uploaded = safe_upload_image($_FILES['image'], 'product');
-            if ($uploaded) {
-                $imagePath = $uploaded;
+        $gallery = $product ? product_gallery_paths($product) : [];
+        // Keep existing unless new uploads replace slots
+        $slots = [
+            trim((string) ($_POST['keep_image_0'] ?? ($gallery[0] ?? ''))),
+            trim((string) ($_POST['keep_image_1'] ?? ($gallery[1] ?? ''))),
+            trim((string) ($_POST['keep_image_2'] ?? ($gallery[2] ?? ''))),
+        ];
+
+        foreach (['image', 'image_2', 'image_3'] as $idx => $field) {
+            if (!empty($_FILES[$field]['name'])) {
+                $uploaded = safe_upload_image($_FILES[$field], 'product');
+                if ($uploaded) {
+                    $slots[$idx] = $uploaded;
+                }
             }
         }
-        if ($imagePath === '') {
-            throw new RuntimeException('Please upload a product image.');
-        }
 
-        // Unique slug
+        // Remove empty slots and reindex
+        $slots = array_values(array_filter($slots, static fn ($p) => $p !== ''));
+        if (!$slots) {
+            throw new RuntimeException('Please upload at least one product image (up to 3).');
+        }
+        $slots = array_slice($slots, 0, 3);
+        $imagePath = $slots[0];
+        $imagesJson = count($slots) > 1 ? json_encode(array_slice($slots, 1)) : '';
+
         $check = $pdo->prepare('SELECT id FROM products WHERE slug = ? AND id != ? LIMIT 1');
         $check->execute([$slug, $id]);
         if ($check->fetch()) {
@@ -56,17 +70,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($id > 0) {
             $stmt = $pdo->prepare(
-                'UPDATE products SET name=?, slug=?, description=?, price=?, image=?, stock=?, is_active=?, sort_order=?, updated_at=datetime(\'now\',\'localtime\')
-                 WHERE id=?'
+                "UPDATE products SET name=?, slug=?, description=?, price=?, image=?, images=?, stock=?, is_active=?, sort_order=?, updated_at=datetime('now','localtime')
+                 WHERE id=?"
             );
-            $stmt->execute([$name, $slug, $description, $price, $imagePath, $stock, $isActive, $sort, $id]);
+            $stmt->execute([$name, $slug, $description, $price, $imagePath, $imagesJson, $stock, $isActive, $sort, $id]);
             flash('success', 'Product updated successfully.');
         } else {
             $stmt = $pdo->prepare(
-                'INSERT INTO products (name, slug, description, price, image, stock, is_active, sort_order)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+                'INSERT INTO products (name, slug, description, price, image, images, stock, is_active, sort_order)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
-            $stmt->execute([$name, $slug, $description, $price, $imagePath, $stock, $isActive, $sort]);
+            $stmt->execute([$name, $slug, $description, $price, $imagePath, $imagesJson, $stock, $isActive, $sort]);
             flash('success', 'New product added.');
         }
         redirect('admin/products.php');
@@ -78,7 +92,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'slug' => $slug,
             'description' => $description,
             'price' => $price,
-            'image' => $product['image'] ?? '',
+            'image' => $imagePath ?? ($product['image'] ?? ''),
+            'images' => $imagesJson ?? ($product['images'] ?? ''),
             'stock' => $stock,
             'is_active' => $isActive,
             'sort_order' => $sort,
@@ -89,6 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $pageTitle = ($id ? 'Edit Product' : 'Add Product') . ' | ' . APP_NAME;
 $adminActive = 'add';
 $adminHeading = $id ? 'Edit Product' : 'Add Product';
+$galleryPreview = $product ? product_gallery_paths($product) : [];
 require __DIR__ . '/../includes/admin_header.php';
 ?>
 
@@ -133,13 +149,26 @@ require __DIR__ . '/../includes/admin_header.php';
         <input type="number" id="sort_order" name="sort_order" step="1"
                value="<?= e((string) ($product['sort_order'] ?? '0')) ?>">
       </div>
+
       <div class="form-group">
-        <label for="image">Product Photo <?= $id ? '(leave empty to keep current)' : '' ?></label>
-        <input type="file" id="image" name="image" accept="image/jpeg,image/png,image/webp,image/gif" <?= $id ? '' : 'required' ?>>
-        <?php if (!empty($product['image'])): ?>
-          <img class="preview-img" src="<?= e(product_image_url($product['image'])) ?>" alt="Current">
-        <?php endif; ?>
+        <label>Product Photos (2–3 recommended)</label>
+        <p style="font-size:13px;color:var(--text-soft);margin:0 0 12px;">Upload up to 3 images. On the shop, hovering a card auto-slides through them.</p>
+        <?php
+          $labels = ['Photo 1 (main)', 'Photo 2', 'Photo 3'];
+          $fields = ['image', 'image_2', 'image_3'];
+        ?>
+        <?php for ($i = 0; $i < 3; $i++): ?>
+          <div style="margin-bottom:14px;padding:12px;border:1px solid rgba(38,38,38,0.08);border-radius:12px;background:#fff;">
+            <label for="<?= e($fields[$i]) ?>" style="font-weight:700;"><?= e($labels[$i]) ?></label>
+            <input type="hidden" name="keep_image_<?= $i ?>" value="<?= e($galleryPreview[$i] ?? '') ?>">
+            <input type="file" id="<?= e($fields[$i]) ?>" name="<?= e($fields[$i]) ?>" accept="image/jpeg,image/png,image/webp,image/gif" <?= ($i === 0 && !$id && empty($galleryPreview[0])) ? 'required' : '' ?>>
+            <?php if (!empty($galleryPreview[$i])): ?>
+              <img class="preview-img" src="<?= e(product_image_url($galleryPreview[$i])) ?>" alt="Current photo <?= $i + 1 ?>" style="margin-top:8px;max-height:120px;border-radius:8px;">
+            <?php endif; ?>
+          </div>
+        <?php endfor; ?>
       </div>
+
       <div class="form-group">
         <label>
           <input type="checkbox" name="is_active" value="1" <?= !isset($product['is_active']) || (int) $product['is_active'] === 1 ? 'checked' : '' ?>>

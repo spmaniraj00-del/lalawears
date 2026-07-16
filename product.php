@@ -25,6 +25,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('product.php?id=' . (int) $product['id']);
     }
 
+    if ($action === 'toggle_wishlist') {
+        $added = wishlist_toggle((int) $product['id'], $user);
+        flash('success', $added ? 'Added to wishlist.' : 'Removed from wishlist.');
+        redirect('product.php?id=' . (int) $product['id']);
+    }
+
     if ($action === 'add_review') {
         if (!$user || $user['role'] !== 'user') {
             flash('error', 'Please sign in to write a review.');
@@ -36,31 +42,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $comment = mb_substr($comment, 0, 1000);
         }
 
-        // Up to 3 optional photos
         $images = [];
-        if (!empty($_FILES['photos']) && is_array($_FILES['photos']['name'])) {
-            $count = min(3, count($_FILES['photos']['name']));
-            for ($i = 0; $i < $count; $i++) {
-                $file = [
-                    'name' => $_FILES['photos']['name'][$i],
-                    'type' => $_FILES['photos']['type'][$i],
-                    'tmp_name' => $_FILES['photos']['tmp_name'][$i],
-                    'error' => $_FILES['photos']['error'][$i],
-                    'size' => $_FILES['photos']['size'][$i],
-                ];
-                try {
-                    $path = safe_upload_image($file, 'review');
-                    if ($path !== null) {
-                        $images[] = $path;
-                    }
-                } catch (RuntimeException $ex) {
-                    flash('error', $ex->getMessage());
-                    redirect('product.php?id=' . (int) $product['id'] . '#reviews');
+        foreach (array_slice(uploaded_files_list('photos'), 0, 3) as $file) {
+            try {
+                $path = safe_upload_image($file, 'review');
+                if ($path !== null) {
+                    $images[] = $path;
                 }
+            } catch (RuntimeException $ex) {
+                flash('error', $ex->getMessage());
+                redirect('product.php?id=' . (int) $product['id'] . '#reviews');
             }
         }
 
-        // One review per user per product — latest one wins
         db()->prepare('DELETE FROM reviews WHERE product_id = ? AND user_id = ?')
             ->execute([(int) $product['id'], (int) $user['id']]);
         db()->prepare('INSERT INTO reviews (product_id, user_id, rating, comment, images) VALUES (?, ?, ?, ?, ?)')
@@ -71,7 +65,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $comment,
                 $images ? json_encode($images) : '',
             ]);
-        flash('success', 'Thank you! Your review has been posted.');
+        flash('success', $images
+            ? 'Thank you! Your review and photos have been posted.'
+            : 'Thank you! Your review has been posted.');
         redirect('product.php?id=' . (int) $product['id'] . '#reviews');
     }
 }
@@ -81,6 +77,8 @@ $sold = product_sold_count((int) $product['id']);
 $reviews = product_reviews((int) $product['id']);
 $mrp = product_mrp((float) $product['price']);
 $off = product_discount_percent((float) $product['price']);
+$gallery = product_gallery_paths($product);
+$inWishlist = wishlist_has((int) $product['id'], $user);
 
 $checkoutUrl = ($user && $user['role'] === 'user')
     ? url('account/checkout.php?product_id=' . (int) $product['id'])
@@ -113,9 +111,20 @@ function star_row(float $avg): string
     <div class="product-hero-grid">
 
       <div class="product-gallery reveal-up">
-        <div class="product-gallery-frame">
-          <img src="<?= e(product_image_url($product['image'])) ?>" alt="<?= e($product['name']) ?>">
+        <div class="product-gallery-frame" data-product-gallery>
+          <?php foreach ($gallery as $i => $imgPath): ?>
+            <img src="<?= e(product_image_url($imgPath)) ?>" alt="<?= e($product['name']) ?>" class="gallery-main<?= $i === 0 ? ' is-active' : '' ?>" data-gallery-index="<?= $i ?>">
+          <?php endforeach; ?>
         </div>
+        <?php if (count($gallery) > 1): ?>
+          <div class="product-thumbs" role="tablist" aria-label="Product photos">
+            <?php foreach ($gallery as $i => $imgPath): ?>
+              <button type="button" class="product-thumb<?= $i === 0 ? ' is-active' : '' ?>" data-gallery-goto="<?= $i ?>" aria-label="Photo <?= $i + 1 ?>">
+                <img src="<?= e(product_image_url($imgPath)) ?>" alt="">
+              </button>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
       </div>
 
       <div class="product-info reveal-up">
@@ -155,8 +164,8 @@ function star_row(float $avg): string
               </svg>
               Add to Cart
             </button>
-            <button type="button" class="btn-wish" aria-label="Add to wishlist">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <button type="submit" name="action" value="toggle_wishlist" class="btn-wish<?= $inWishlist ? ' is-active' : '' ?>" aria-label="<?= $inWishlist ? 'Remove from wishlist' : 'Add to wishlist' ?>" aria-pressed="<?= $inWishlist ? 'true' : 'false' ?>">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="<?= $inWishlist ? 'currentColor' : 'none' ?>" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
               </svg>
             </button>
@@ -278,15 +287,15 @@ function star_row(float $avg): string
           <textarea name="comment" maxlength="1000"
             placeholder="What did you like or dislike? What did you use this product for?"></textarea>
 
-          <p class="review-field-label">Add Photos <span class="optional-note">(Optional)</span></p>
+          <p class="review-field-label">Add Photos <span class="optional-note">(Optional · up to 3)</span></p>
           <div class="review-photo-row" data-photo-row>
             <label class="review-upload-box" for="review-photos">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
               <span>Upload</span>
             </label>
-            <input type="file" id="review-photos" name="photos[]" accept="image/png,image/jpeg,image/webp" multiple hidden>
+            <input type="file" id="review-photos" name="photos[]" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif" multiple class="sr-only-file">
           </div>
-          <p class="review-upload-note">You can upload up to 3 images (PNG, JPG).</p>
+          <p class="review-upload-note">PNG, JPG, WEBP or GIF — max 5MB each. Photos show under your review after submit.</p>
 
           <div class="review-modal-actions">
             <button type="button" class="btn-cancel" data-close-review>Cancel</button>

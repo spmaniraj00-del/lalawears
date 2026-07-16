@@ -34,7 +34,71 @@ document.addEventListener('DOMContentLoaded', () => {
   initReviewModal();
   initCheckoutSummary();
   initFounderCard();
+  initHoverSlides();
+  initProductGallery();
 });
+
+function initHoverSlides() {
+  document.querySelectorAll('[data-hover-slide]').forEach((el) => {
+    const imgs = Array.from(el.querySelectorAll('img'));
+    if (imgs.length < 2) return;
+    let idx = 0;
+    let timer = null;
+    const show = (n) => {
+      imgs.forEach((img, i) => img.classList.toggle('is-active', i === n));
+      idx = n;
+    };
+    show(0);
+    const start = () => {
+      stop();
+      timer = setInterval(() => show((idx + 1) % imgs.length), 900);
+    };
+    const stop = () => {
+      if (timer) clearInterval(timer);
+      timer = null;
+      show(0);
+    };
+    el.addEventListener('mouseenter', start);
+    el.addEventListener('mouseleave', stop);
+    el.addEventListener('focusin', start);
+    el.addEventListener('focusout', stop);
+  });
+}
+
+function initProductGallery() {
+  const frame = document.querySelector('[data-product-gallery]');
+  if (!frame) return;
+  const mains = Array.from(frame.querySelectorAll('.gallery-main'));
+  const thumbs = Array.from(document.querySelectorAll('[data-gallery-goto]'));
+  if (mains.length < 2) return;
+
+  let idx = 0;
+  let timer = null;
+  const show = (n) => {
+    idx = ((n % mains.length) + mains.length) % mains.length;
+    mains.forEach((img, i) => img.classList.toggle('is-active', i === idx));
+    thumbs.forEach((btn, i) => btn.classList.toggle('is-active', i === idx));
+  };
+
+  thumbs.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      show(parseInt(btn.dataset.galleryGoto || '0', 10));
+      if (timer) {
+        clearInterval(timer);
+        timer = setInterval(() => show(idx + 1), 2800);
+      }
+    });
+  });
+
+  frame.addEventListener('mouseenter', () => {
+    if (timer) return;
+    timer = setInterval(() => show(idx + 1), 1800);
+  });
+  frame.addEventListener('mouseleave', () => {
+    if (timer) clearInterval(timer);
+    timer = null;
+  });
+}
 
 function initFounderCard() {
   const card = document.querySelector('[data-founder-card]');
@@ -99,6 +163,7 @@ function initReviewModal() {
 
   const openBtn = document.querySelector('[data-open-review]');
   const closeBtns = overlay.querySelectorAll('[data-close-review]');
+  const form = overlay.querySelector('#write-review');
   const fileInput = overlay.querySelector('#review-photos');
   const photoRow = overlay.querySelector('[data-photo-row]');
   const uploadBox = overlay.querySelector('.review-upload-box');
@@ -123,12 +188,16 @@ function initReviewModal() {
     if (e.key === 'Escape' && !overlay.hidden) close();
   });
 
-  if (!fileInput || !photoRow || !uploadBox) return;
+  if (!fileInput || !photoRow || !uploadBox || !form) return;
+
+  const canUseDataTransfer = typeof DataTransfer !== 'undefined';
 
   const syncInput = () => {
-    const dt = new DataTransfer();
-    files.forEach((f) => dt.items.add(f));
-    fileInput.files = dt.files;
+    if (canUseDataTransfer) {
+      const dt = new DataTransfer();
+      files.forEach((f) => dt.items.add(f));
+      fileInput.files = dt.files;
+    }
     uploadBox.style.display = files.length >= MAX_PHOTOS ? 'none' : 'flex';
   };
 
@@ -158,12 +227,40 @@ function initReviewModal() {
   fileInput.addEventListener('change', () => {
     const incoming = Array.from(fileInput.files || []);
     incoming.forEach((f) => {
-      if (files.length < MAX_PHOTOS && f.type.startsWith('image/')) {
+      if (files.length < MAX_PHOTOS && (f.type.startsWith('image/') || /\.(jpe?g|png|webp|gif)$/i.test(f.name))) {
         files.push(f);
       }
     });
     syncInput();
     renderPreviews();
+    // Allow selecting the same file again after remove
+    if (!canUseDataTransfer) {
+      fileInput.value = '';
+    }
+  });
+
+  form.addEventListener('submit', (e) => {
+    if (!files.length || canUseDataTransfer) {
+      // Native submit works when DataTransfer synced the input
+      return;
+    }
+    // Fallback: rebuild FormData so photos always post
+    e.preventDefault();
+    const fd = new FormData(form);
+    fd.delete('photos[]');
+    files.forEach((f) => fd.append('photos[]', f, f.name));
+    const actionBtn = form.querySelector('button[name="action"][value="add_review"]');
+    if (actionBtn) fd.set('action', 'add_review');
+    fetch(form.getAttribute('action') || window.location.href, {
+      method: 'POST',
+      body: fd,
+      credentials: 'same-origin',
+      redirect: 'follow',
+    }).then((res) => {
+      window.location.href = res.url || (window.location.pathname + window.location.search + '#reviews');
+    }).catch(() => {
+      form.submit();
+    });
   });
 }
 

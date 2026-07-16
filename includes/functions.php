@@ -96,6 +96,45 @@ function product_image_url(string $image): string
     return asset(ltrim($image, '/'));
 }
 
+/** All gallery paths for a product (primary + extras), max 3. */
+function product_gallery_paths(array $product): array
+{
+    $paths = [];
+    $primary = trim((string) ($product['image'] ?? ''));
+    if ($primary !== '') {
+        $paths[] = $primary;
+    }
+    $extra = trim((string) ($product['images'] ?? ''));
+    if ($extra !== '') {
+        $decoded = json_decode($extra, true);
+        if (is_array($decoded)) {
+            foreach ($decoded as $p) {
+                $p = trim((string) $p);
+                if ($p !== '' && !in_array($p, $paths, true)) {
+                    $paths[] = $p;
+                }
+            }
+        }
+    }
+    if (!$paths) {
+        $paths[] = 'images/ss.png';
+    }
+    return array_slice($paths, 0, 3);
+}
+
+function ensure_upload_dir(): void
+{
+    if (!is_dir(UPLOAD_DIR)) {
+        mkdir(UPLOAD_DIR, 0775, true);
+    }
+    if (!is_writable(UPLOAD_DIR)) {
+        @chmod(UPLOAD_DIR, 0775);
+    }
+    if (!is_writable(UPLOAD_DIR)) {
+        throw new RuntimeException('Upload folder is not writable. Fix permissions on assets/uploads.');
+    }
+}
+
 function client_ip(): string
 {
     return $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
@@ -131,18 +170,31 @@ function is_login_locked(PDO $pdo, string $identifier): bool
 
 function safe_upload_image(array $file, string $prefix = 'product'): ?string
 {
-    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+    $err = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
+    if ($err === UPLOAD_ERR_NO_FILE || trim((string) ($file['name'] ?? '')) === '') {
         return null;
     }
-    if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
-        throw new RuntimeException('Image upload failed.');
+    $errMessages = [
+        UPLOAD_ERR_INI_SIZE => 'Image is too large for the server limit.',
+        UPLOAD_ERR_FORM_SIZE => 'Image is too large.',
+        UPLOAD_ERR_PARTIAL => 'Image upload was incomplete. Try again.',
+        UPLOAD_ERR_NO_TMP_DIR => 'Server temp folder missing.',
+        UPLOAD_ERR_CANT_WRITE => 'Server could not write the image.',
+        UPLOAD_ERR_EXTENSION => 'Upload blocked by server extension.',
+    ];
+    if ($err !== UPLOAD_ERR_OK) {
+        throw new RuntimeException($errMessages[$err] ?? 'Image upload failed.');
     }
     if (($file['size'] ?? 0) > 5 * 1024 * 1024) {
         throw new RuntimeException('Image must be under 5MB.');
     }
+    $tmp = (string) ($file['tmp_name'] ?? '');
+    if ($tmp === '' || !is_uploaded_file($tmp)) {
+        throw new RuntimeException('Invalid uploaded file.');
+    }
 
     $finfo = new finfo(FILEINFO_MIME_TYPE);
-    $mime = $finfo->file($file['tmp_name']);
+    $mime = $finfo->file($tmp) ?: '';
     $allowed = [
         'image/jpeg' => 'jpg',
         'image/png' => 'png',
@@ -153,17 +205,38 @@ function safe_upload_image(array $file, string $prefix = 'product'): ?string
         throw new RuntimeException('Only JPG, PNG, WEBP or GIF images allowed.');
     }
 
-    if (!is_dir(UPLOAD_DIR)) {
-        mkdir(UPLOAD_DIR, 0755, true);
-    }
+    ensure_upload_dir();
 
     $name = $prefix . '_' . bin2hex(random_bytes(8)) . '.' . $allowed[$mime];
     $dest = UPLOAD_DIR . DIRECTORY_SEPARATOR . $name;
-    if (!move_uploaded_file($file['tmp_name'], $dest)) {
+    if (!move_uploaded_file($tmp, $dest)) {
         throw new RuntimeException('Could not save uploaded image.');
     }
 
     return 'uploads/' . $name;
+}
+
+/** Normalize $_FILES['photos'] / photos[] into a list of single-file arrays. */
+function uploaded_files_list(string $field): array
+{
+    if (empty($_FILES[$field]) || !is_array($_FILES[$field])) {
+        return [];
+    }
+    $bag = $_FILES[$field];
+    if (!isset($bag['name']) || !is_array($bag['name'])) {
+        return [$bag];
+    }
+    $out = [];
+    foreach ($bag['name'] as $i => $name) {
+        $out[] = [
+            'name' => $name,
+            'type' => $bag['type'][$i] ?? '',
+            'tmp_name' => $bag['tmp_name'][$i] ?? '',
+            'error' => $bag['error'][$i] ?? UPLOAD_ERR_NO_FILE,
+            'size' => $bag['size'][$i] ?? 0,
+        ];
+    }
+    return $out;
 }
 
 function set_security_headers(): void
@@ -498,4 +571,126 @@ function get_order_tracking(int $orderId): array
     );
     $stmt->execute([$orderId]);
     return $stmt->fetchAll();
+}
+
+/* ——— Wishlist ——— */
+
+function wishlist_guest_ids(): array
+{
+    $ids = $_SESSION['wishlist'] ?? [];
+    if (!is_array($ids)) {
+        return [];
+    }
+    return array_values(array_unique(array_map('intval', $ids)));
+}
+
+function wishlist_set_guest(array $ids): void
+{
+    $_SESSION['wishlist'] = array_values(array_unique(array_map('intval', $ids)));
+}
+
+function wishlist_has(int $productId, ?array $user = null): bool
+{
+    $user = $user ?? current_user();
+    if ($user && ($user['role'] ?? '') === 'user') {
+        $stmt = db()->prepare('SELECT 1 FROM wishlists WHERE user_id = ? AND product_id = ? LIMIT 1');
+        $stmt->execute([(int) $user['id'], $productId]);
+        return (bool) $stmt->fetchColumn();
+    }
+    return in_array($productId, wishlist_guest_ids(), true);
+}
+
+function wishlist_toggle(int $productId, ?array $user = null): bool
+{
+    $user = $user ?? current_user();
+    if ($productId <= 0) {
+        return false;
+    }
+    $check = db()->prepare('SELECT id FROM products WHERE id = ? AND is_active = 1 LIMIT 1');
+    $check->execute([$productId]);
+    if (!$check->fetch()) {
+        return false;
+    }
+
+    if ($user && ($user['role'] ?? '') === 'user') {
+        $uid = (int) $user['id'];
+        if (wishlist_has($productId, $user)) {
+            db()->prepare('DELETE FROM wishlists WHERE user_id = ? AND product_id = ?')
+                ->execute([$uid, $productId]);
+            return false;
+        }
+        db()->prepare('INSERT OR IGNORE INTO wishlists (user_id, product_id) VALUES (?, ?)')
+            ->execute([$uid, $productId]);
+        return true;
+    }
+
+    $ids = wishlist_guest_ids();
+    if (in_array($productId, $ids, true)) {
+        $ids = array_values(array_filter($ids, static fn ($id) => $id !== $productId));
+        wishlist_set_guest($ids);
+        return false;
+    }
+    $ids[] = $productId;
+    wishlist_set_guest($ids);
+    return true;
+}
+
+function wishlist_count(?array $user = null): int
+{
+    $user = $user ?? current_user();
+    if ($user && ($user['role'] ?? '') === 'user') {
+        $stmt = db()->prepare('SELECT COUNT(*) FROM wishlists WHERE user_id = ?');
+        $stmt->execute([(int) $user['id']]);
+        return (int) $stmt->fetchColumn();
+    }
+    return count(wishlist_guest_ids());
+}
+
+function wishlist_products(?array $user = null): array
+{
+    $user = $user ?? current_user();
+    if ($user && ($user['role'] ?? '') === 'user') {
+        $stmt = db()->prepare(
+            'SELECT p.* FROM wishlists w
+             JOIN products p ON p.id = w.product_id
+             WHERE w.user_id = ? AND p.is_active = 1
+             ORDER BY w.id DESC'
+        );
+        $stmt->execute([(int) $user['id']]);
+        return $stmt->fetchAll();
+    }
+    $ids = wishlist_guest_ids();
+    if (!$ids) {
+        return [];
+    }
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $stmt = db()->prepare(
+        "SELECT * FROM products WHERE is_active = 1 AND id IN ($placeholders)"
+    );
+    $stmt->execute($ids);
+    $rows = $stmt->fetchAll();
+    // Keep guest order
+    $byId = [];
+    foreach ($rows as $row) {
+        $byId[(int) $row['id']] = $row;
+    }
+    $ordered = [];
+    foreach (array_reverse($ids) as $id) {
+        if (isset($byId[$id])) {
+            $ordered[] = $byId[$id];
+        }
+    }
+    return $ordered;
+}
+
+/** Merge guest wishlist into user account after login. */
+function wishlist_merge_guest_into_user(int $userId): void
+{
+    foreach (wishlist_guest_ids() as $pid) {
+        if ($pid > 0) {
+            db()->prepare('INSERT OR IGNORE INTO wishlists (user_id, product_id) VALUES (?, ?)')
+                ->execute([$userId, $pid]);
+        }
+    }
+    unset($_SESSION['wishlist']);
 }
