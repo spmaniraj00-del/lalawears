@@ -1,0 +1,14 @@
+{
+	auto_https off
+	admin off
+}
+
+:{$PORT} {
+	root * /app
+	encode zstd gzip
+
+	@blocked path /config/* /includes/* /data/*
+	respond @blocked 403
+
+	php_server
+}

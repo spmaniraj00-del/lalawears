@@ -1,0 +1,10 @@
+.git
+.gitignore
+*.md
+config/config.local.php
+data/*.sqlite
+data/*.sqlite-journal
+data/*.log
+agent-transcripts
+.cursor
+**/__pycache__

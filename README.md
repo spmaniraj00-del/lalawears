@@ -2,14 +2,26 @@
 
 Premium clothing storefront with **Google Sign-In**, order tracking, and notifications.
 
-## Run
+## Run (local)
 
 ```bash
-cd C:\Users\Mani272\Desktop\websit
 php -S localhost:8080 router.php
 ```
 
 Open: http://localhost:8080
+
+## Deploy on Railway
+
+1. Push this repo to GitHub (include `Dockerfile`, `Caddyfile`, `railway.toml`).
+2. In Railway → **New Project** → **Deploy from GitHub repo**.
+3. Railway will build with the `Dockerfile` (FrankenPHP + SQLite).
+4. Open the public URL Railway gives you (Settings → Domains → Generate Domain).
+
+Important:
+- Do **not** set a custom Start Command in Railway (Dockerfile already starts the server).
+- Root Directory should be the project root (where `Dockerfile` lives).
+- For real traffic, add a **Volume** mounted at `/app/data` so orders/users survive redeploys.
+- Optional: mount another volume at `/app/assets/uploads` for product/review images.
 
 ## Customer login (Phone + OTP)
 
