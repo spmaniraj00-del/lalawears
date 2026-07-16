@@ -63,6 +63,23 @@ Rules → Redirect Rules → create:
 - `FORCE_HTTPS` = `1`
 - `FORCE_CANONICAL_HOST` = `1` (redirects bare domain → www)
 
+#### 4b) Forgot password / email (Resend) — same as before
+Railway → your service → **Variables** → add:
+
+| Variable | What to paste |
+|----------|----------------|
+| `RESEND_API_KEY` | From [resend.com/api-keys](https://resend.com/api-keys) (starts with `re_`) |
+| `RESEND_FROM` | `onboarding@resend.dev` (same as earlier working emails) |
+| `APP_URL` | `https://www.lalawearscraftedforstyle.com` |
+
+Then **Redeploy**.
+
+**Important (Resend free / testing sender):**
+- From `onboarding@resend.dev`, mail usually goes **only** to the Gmail that owns your Resend account (the inbox where you already got “Reset Your Password - LALA WEARS”).
+- Other Gmails will **not** get the link until you verify a domain in Resend and set e.g. `RESEND_FROM=noreply@yourdomain.com`.
+
+Check **Inbox + Spam**. Subject: `Reset Your Password - LALA WEARS`.
+
 #### 5) Google OAuth (Continue with Google)
 Railway **Variables** (required or the Google button stays hidden):
 

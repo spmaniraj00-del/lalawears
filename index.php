@@ -150,7 +150,7 @@ function product_category(array $p): string
           <div class="deal-media-wrap">
             <a class="deal-media" href="<?= e($productUrl) ?>" data-hover-slide>
               <?php foreach ($gallery as $i => $imgPath): ?>
-                <img src="<?= e(product_image_url($imgPath)) ?>" alt="<?= e($product['name']) ?>" <?= $i === 0 ? '' : 'loading="lazy"' ?> class="<?= $i === 0 ? 'is-active' : '' ?>">
+                <img src="<?= e(product_image_url($imgPath)) ?>" alt="<?= e($product['name']) ?>" <?= $i === 0 ? '' : 'loading="lazy"' ?> class="<?= $i === 0 ? 'is-active' : '' ?>" width="600" height="600">
               <?php endforeach; ?>
               <?php if (count($gallery) > 1): ?>
                 <div class="deal-media-dots" aria-hidden="true">
@@ -159,8 +159,8 @@ function product_category(array $p): string
                   <?php endforeach; ?>
                 </div>
               <?php endif; ?>
-              <span class="deal-tag">Premium</span>
             </a>
+            <span class="deal-tag">Premium</span>
             <form method="post" action="<?= e(url('wishlist.php')) ?>" class="deal-wish-form">
               <?= csrf_field() ?>
               <input type="hidden" name="action" value="toggle">

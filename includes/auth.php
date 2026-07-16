@@ -402,11 +402,11 @@ function send_password_reset_link(string $email): array
     $stmt->execute([$email]);
     $user = $stmt->fetch();
 
-    // Same message whether or not the account exists (no email leak)
-    $genericOk = 'If your email is registered, you will receive a password reset link shortly.';
-
     if (!$user) {
-        return ['ok' => true, 'message' => $genericOk, 'email_sent' => false];
+        return [
+            'ok' => false,
+            'error' => 'No customer account found with this email. Use the same Gmail you registered / signed in with.',
+        ];
     }
 
     $token = bin2hex(random_bytes(16));
@@ -426,28 +426,32 @@ function send_password_reset_link(string $email): array
           . '<p style="color:#8a8a8a; font-size:12px; margin-top:30px;">If you did not request this, ignore this email.</p>'
           . '</div>';
 
-    $sent = ['ok' => false, 'error' => ''];
+    $sent = ['ok' => false, 'error' => 'Email service is not configured.'];
     if (resend_configured()) {
         $sent = resend_send_email($email, $subject, $html);
-    } else {
-        $sent = ['ok' => false, 'error' => 'Email service is not configured.'];
     }
 
-    // Same as OTP: if on-site mode is on, always succeed and show the link on the page
-    if (!$sent['ok'] && !OTP_SHOW_ON_SITE) {
-        return ['ok' => false, 'error' => $sent['error'] !== '' ? $sent['error'] : 'Could not send reset email.'];
+    // Always show link on page as backup (Resend free sender often blocks other Gmails)
+    if (!empty($sent['ok'])) {
+        return [
+            'ok' => true,
+            'message' => 'Reset link sent to ' . $email . '. Check Inbox and Spam. Link expires in 15 minutes.',
+            'email_sent' => true,
+            'reset_link' => $resetLink,
+            'to' => $email,
+        ];
     }
 
-    $message = !empty($sent['ok'])
-        ? 'Reset link sent to your email. Check inbox (and spam). Link expires in 15 minutes.'
-        : 'Could not reach your inbox right now — use the reset link below (valid 15 minutes).';
+    $apiError = trim((string) ($sent['error'] ?? ''));
+    $hint = 'Resend free sender (onboarding@resend.dev) usually only delivers to the Gmail linked to your Resend account. '
+        . 'Other Gmails will not receive the mail until you verify your domain in Resend.';
 
     return [
         'ok' => true,
-        'message' => $message,
-        'email_sent' => !empty($sent['ok']),
-        'show_on_site' => OTP_SHOW_ON_SITE,
-        'reset_link' => OTP_SHOW_ON_SITE ? $resetLink : '',
+        'message' => 'Email could not be delivered' . ($apiError !== '' ? ': ' . $apiError : '.') . ' ' . $hint,
+        'email_sent' => false,
+        'reset_link' => $resetLink,
+        'to' => $email,
     ];
 }
 
