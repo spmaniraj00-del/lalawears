@@ -17,7 +17,7 @@ $searchQuery = trim((string) ($_GET['q'] ?? ''));
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=League+Spartan:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="<?= e(asset('css/style.css')) ?>?v=2.3">
+  <link rel="stylesheet" href="<?= e(asset('css/style.css')) ?>?v=2.4">
   <link rel="icon" href="<?= e(asset('images/log.png')) ?>">
 </head>
 <body class="<?= e($bodyClass) ?>">

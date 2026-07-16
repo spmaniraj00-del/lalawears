@@ -111,20 +111,38 @@ function star_row(float $avg): string
     <div class="product-hero-grid">
 
       <div class="product-gallery reveal-up">
-        <div class="product-gallery-frame" data-product-gallery>
-          <?php foreach ($gallery as $i => $imgPath): ?>
-            <img src="<?= e(product_image_url($imgPath)) ?>" alt="<?= e($product['name']) ?>" class="gallery-main<?= $i === 0 ? ' is-active' : '' ?>" data-gallery-index="<?= $i ?>">
-          <?php endforeach; ?>
-        </div>
-        <?php if (count($gallery) > 1): ?>
-          <div class="product-thumbs" role="tablist" aria-label="Product photos">
+        <div class="product-slider" data-product-gallery data-count="<?= count($gallery) ?>">
+          <div class="product-gallery-frame">
             <?php foreach ($gallery as $i => $imgPath): ?>
-              <button type="button" class="product-thumb<?= $i === 0 ? ' is-active' : '' ?>" data-gallery-goto="<?= $i ?>" aria-label="Photo <?= $i + 1 ?>">
-                <img src="<?= e(product_image_url($imgPath)) ?>" alt="">
-              </button>
+              <img src="<?= e(product_image_url($imgPath)) ?>" alt="<?= e($product['name']) ?> — photo <?= $i + 1 ?>" class="gallery-main<?= $i === 0 ? ' is-active' : '' ?>" data-gallery-index="<?= $i ?>" draggable="false">
             <?php endforeach; ?>
+
+            <?php if (count($gallery) > 1): ?>
+              <button type="button" class="gallery-nav gallery-prev" data-gallery-prev aria-label="Previous photo">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              </button>
+              <button type="button" class="gallery-nav gallery-next" data-gallery-next aria-label="Next photo">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </button>
+              <div class="gallery-dots" aria-hidden="true">
+                <?php foreach ($gallery as $i => $_): ?>
+                  <button type="button" class="gallery-dot<?= $i === 0 ? ' is-active' : '' ?>" data-gallery-goto="<?= $i ?>" aria-label="Photo <?= $i + 1 ?>"></button>
+                <?php endforeach; ?>
+              </div>
+              <span class="gallery-counter"><span data-gallery-current>1</span> / <?= count($gallery) ?></span>
+            <?php endif; ?>
           </div>
-        <?php endif; ?>
+
+          <?php if (count($gallery) > 1): ?>
+            <div class="product-thumbs" role="tablist" aria-label="Product photos">
+              <?php foreach ($gallery as $i => $imgPath): ?>
+                <button type="button" class="product-thumb<?= $i === 0 ? ' is-active' : '' ?>" data-gallery-goto="<?= $i ?>" aria-label="Photo <?= $i + 1 ?>">
+                  <img src="<?= e(product_image_url($imgPath)) ?>" alt="">
+                </button>
+              <?php endforeach; ?>
+            </div>
+          <?php endif; ?>
+        </div>
       </div>
 
       <div class="product-info reveal-up">

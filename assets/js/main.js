@@ -66,38 +66,75 @@ function initHoverSlides() {
 }
 
 function initProductGallery() {
-  const frame = document.querySelector('[data-product-gallery]');
-  if (!frame) return;
-  const mains = Array.from(frame.querySelectorAll('.gallery-main'));
-  const thumbs = Array.from(document.querySelectorAll('[data-gallery-goto]'));
+  const root = document.querySelector('[data-product-gallery]');
+  if (!root) return;
+  const frame = root.querySelector('.product-gallery-frame') || root;
+  const mains = Array.from(root.querySelectorAll('.gallery-main'));
   if (mains.length < 2) return;
 
+  const gotoBtns = Array.from(root.querySelectorAll('[data-gallery-goto]'));
+  const prevBtn = root.querySelector('[data-gallery-prev]');
+  const nextBtn = root.querySelector('[data-gallery-next]');
+  const counter = root.querySelector('[data-gallery-current]');
   let idx = 0;
   let timer = null;
+
   const show = (n) => {
     idx = ((n % mains.length) + mains.length) % mains.length;
     mains.forEach((img, i) => img.classList.toggle('is-active', i === idx));
-    thumbs.forEach((btn, i) => btn.classList.toggle('is-active', i === idx));
+    gotoBtns.forEach((btn) => {
+      const i = parseInt(btn.dataset.galleryGoto || '0', 10);
+      btn.classList.toggle('is-active', i === idx);
+    });
+    if (counter) counter.textContent = String(idx + 1);
   };
 
-  thumbs.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      show(parseInt(btn.dataset.galleryGoto || '0', 10));
-      if (timer) {
-        clearInterval(timer);
-        timer = setInterval(() => show(idx + 1), 2800);
-      }
-    });
-  });
-
-  frame.addEventListener('mouseenter', () => {
-    if (timer) return;
-    timer = setInterval(() => show(idx + 1), 1800);
-  });
-  frame.addEventListener('mouseleave', () => {
+  const stopAuto = () => {
     if (timer) clearInterval(timer);
     timer = null;
+  };
+  const startAuto = () => {
+    stopAuto();
+    timer = setInterval(() => show(idx + 1), 3200);
+  };
+
+  gotoBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      show(parseInt(btn.dataset.galleryGoto || '0', 10));
+      startAuto();
+    });
   });
+  if (prevBtn) prevBtn.addEventListener('click', () => { show(idx - 1); startAuto(); });
+  if (nextBtn) nextBtn.addEventListener('click', () => { show(idx + 1); startAuto(); });
+
+  // Swipe / drag
+  let startX = 0;
+  let dragging = false;
+  frame.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    startX = e.clientX;
+    frame.setPointerCapture?.(e.pointerId);
+  });
+  frame.addEventListener('pointerup', (e) => {
+    if (!dragging) return;
+    dragging = false;
+    const dx = e.clientX - startX;
+    if (Math.abs(dx) > 40) {
+      show(dx < 0 ? idx + 1 : idx - 1);
+      startAuto();
+    }
+  });
+  frame.addEventListener('pointercancel', () => { dragging = false; });
+
+  root.addEventListener('mouseenter', startAuto);
+  root.addEventListener('mouseleave', stopAuto);
+  document.addEventListener('keydown', (e) => {
+    if (!root.closest('main')) return;
+    if (e.key === 'ArrowLeft') { show(idx - 1); startAuto(); }
+    if (e.key === 'ArrowRight') { show(idx + 1); startAuto(); }
+  });
+
+  show(0);
 }
 
 function initFounderCard() {

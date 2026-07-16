@@ -96,7 +96,7 @@ function product_image_url(string $image): string
     return asset(ltrim($image, '/'));
 }
 
-/** All gallery paths for a product (primary + extras), max 3. */
+/** All gallery paths for a product (primary + extras), max 4. */
 function product_gallery_paths(array $product): array
 {
     $paths = [];
@@ -119,7 +119,7 @@ function product_gallery_paths(array $product): array
     if (!$paths) {
         $paths[] = 'images/ss.png';
     }
-    return array_slice($paths, 0, 3);
+    return array_slice($paths, 0, 4);
 }
 
 function ensure_upload_dir(): void

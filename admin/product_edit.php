@@ -37,14 +37,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $gallery = $product ? product_gallery_paths($product) : [];
-        // Keep existing unless new uploads replace slots
         $slots = [
             trim((string) ($_POST['keep_image_0'] ?? ($gallery[0] ?? ''))),
             trim((string) ($_POST['keep_image_1'] ?? ($gallery[1] ?? ''))),
             trim((string) ($_POST['keep_image_2'] ?? ($gallery[2] ?? ''))),
+            trim((string) ($_POST['keep_image_3'] ?? ($gallery[3] ?? ''))),
         ];
 
-        foreach (['image', 'image_2', 'image_3'] as $idx => $field) {
+        foreach (['image', 'image_2', 'image_3', 'image_4'] as $idx => $field) {
             if (!empty($_FILES[$field]['name'])) {
                 $uploaded = safe_upload_image($_FILES[$field], 'product');
                 if ($uploaded) {
@@ -53,12 +53,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // Remove empty slots and reindex
         $slots = array_values(array_filter($slots, static fn ($p) => $p !== ''));
         if (!$slots) {
-            throw new RuntimeException('Please upload at least one product image (up to 3).');
+            throw new RuntimeException('Please upload at least one product image (up to 4).');
         }
-        $slots = array_slice($slots, 0, 3);
+        $slots = array_slice($slots, 0, 4);
         $imagePath = $slots[0];
         $imagesJson = count($slots) > 1 ? json_encode(array_slice($slots, 1)) : '';
 
@@ -151,13 +150,13 @@ require __DIR__ . '/../includes/admin_header.php';
       </div>
 
       <div class="form-group">
-        <label>Product Photos (2–3 recommended)</label>
-        <p style="font-size:13px;color:var(--text-soft);margin:0 0 12px;">Upload up to 3 images. On the shop, hovering a card auto-slides through them.</p>
+        <label>Product Photos (2–4 recommended)</label>
+        <p style="font-size:13px;color:var(--text-soft);margin:0 0 12px;">Upload up to <strong>4</strong> images. On the product page customers can slide through all photos (arrows + thumbs).</p>
         <?php
-          $labels = ['Photo 1 (main)', 'Photo 2', 'Photo 3'];
-          $fields = ['image', 'image_2', 'image_3'];
+          $labels = ['Photo 1 (main)', 'Photo 2', 'Photo 3', 'Photo 4'];
+          $fields = ['image', 'image_2', 'image_3', 'image_4'];
         ?>
-        <?php for ($i = 0; $i < 3; $i++): ?>
+        <?php for ($i = 0; $i < 4; $i++): ?>
           <div style="margin-bottom:14px;padding:12px;border:1px solid rgba(38,38,38,0.08);border-radius:12px;background:#fff;">
             <label for="<?= e($fields[$i]) ?>" style="font-weight:700;"><?= e($labels[$i]) ?></label>
             <input type="hidden" name="keep_image_<?= $i ?>" value="<?= e($galleryPreview[$i] ?? '') ?>">
