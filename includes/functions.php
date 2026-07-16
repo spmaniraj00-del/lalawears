@@ -309,6 +309,28 @@ function site_founder_has_photo(): bool
     return setting('founder_photo', '') !== '';
 }
 
+/** Safe display URL for a user avatar (Google photo or local). */
+function user_avatar_url(?array $user): string
+{
+    if (!$user) {
+        return '';
+    }
+    $avatar = trim((string) ($user['avatar'] ?? ''));
+    if ($avatar === '') {
+        return '';
+    }
+    if (str_starts_with($avatar, 'http://') || str_starts_with($avatar, 'https://')) {
+        return $avatar;
+    }
+    return asset(ltrim($avatar, '/'));
+}
+
+function user_avatar_initial(array $user): string
+{
+    $name = trim((string) ($user['name'] ?? '?'));
+    return strtoupper(mb_substr($name !== '' ? $name : '?', 0, 1));
+}
+
 /* ——— Support chat ——— */
 
 function support_thread_key(?array $user, string $email): string

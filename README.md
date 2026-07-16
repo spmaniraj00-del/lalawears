@@ -63,23 +63,34 @@ Rules → Redirect Rules → create:
 - `FORCE_HTTPS` = `1`
 - `FORCE_CANONICAL_HOST` = `1` (redirects bare domain → www)
 
-#### 5) Google OAuth
-Add authorized redirect URI:
-`https://www.lalawearscraftedforstyle.com/auth/google_callback.php`
+#### 5) Google OAuth (Continue with Google)
+Railway **Variables** (required or the Google button stays hidden):
+
+| Variable | Value |
+|----------|--------|
+| `GOOGLE_CLIENT_ID` | from Google Cloud Console |
+| `GOOGLE_CLIENT_SECRET` | from Google Cloud Console |
+| `APP_URL` | `https://www.lalawearscraftedforstyle.com` |
+
+In [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → OAuth client:
+
+- **Authorized JavaScript origins:** `https://www.lalawearscraftedforstyle.com`
+- **Authorized redirect URIs:** `https://www.lalawearscraftedforstyle.com/auth/google_callback.php`
+
+After login, Gmail name + profile photo show in the header, account page, and reviews.
 
 Open the site only as **`https://www.lalawearscraftedforstyle.com`**.
 
-## Customer login (Phone + OTP)
+## Customer login
 
 1. Open `/auth/login.php`
-2. Enter **name** (new users), **phone**, and **email**
-3. 6-digit OTP is sent via **Resend** to the email
-4. Enter code on `/auth/verify.php` → account created / logged in
+2. Prefer **Continue with Google** (Gmail) — photo & name sync automatically
+3. Or sign in with email + password
+4. New users: `/auth/register.php` (Google or email)
 
-Config: `config/config.local.php` → `RESEND_API_KEY`, `RESEND_FROM`
+OTP / Resend (optional email flows): `config/config.local.php` → `RESEND_API_KEY`, `RESEND_FROM`
 
-> Resend sends **email**, not SMS. Phone is your account ID; OTP arrives on email.
-> Free Resend (`onboarding@resend.dev`) usually only delivers to your Resend account email until you verify a domain.
+> Keep secrets in Railway Variables / `config.local.php` (gitignored). Do not commit client secrets.
 
 ## Admin Login
 

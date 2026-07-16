@@ -18,7 +18,7 @@ $adminSupportUnread = unread_support_count();
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="<?= e(asset('css/style.css')) ?>?v=2.1">
+  <link rel="stylesheet" href="<?= e(asset('css/style.css')) ?>?v=2.2">
   <link rel="icon" href="<?= e(asset('images/log.png')) ?>">
 </head>
 <body class="admin-body">
@@ -26,7 +26,7 @@ $adminSupportUnread = unread_support_count();
     <aside class="admin-sidebar">
       <a class="admin-logo" href="<?= e(url('admin/index.php')) ?>">
         <img src="<?= e(site_logo_url()) ?>" alt="LALA WEARS">
-        <span>lala<em>wears</em><small>.co.in</small></span>
+        <span>lala<em>wears</em><small>.com</small></span>
       </a>
 
       <nav class="admin-menu">

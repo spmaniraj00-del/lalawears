@@ -9,7 +9,7 @@
     <div class="footer-inner">
       <a class="footer-brand" href="<?= e(url('index.php')) ?>#home">
         <img src="<?= e(site_logo_url()) ?>" alt="LALA WEARS logo">
-        <span class="footer-brand-name">lala<span>wears</span><small>.co.in</small></span>
+        <span class="footer-brand-name">lala<span>wears</span><small>.com</small></span>
       </a>
 
       <div class="footer-center">
@@ -49,6 +49,6 @@
       </div>
     </div>
   </footer>
-  <script src="<?= e(asset('js/main.js')) ?>?v=2.1"></script>
+  <script src="<?= e(asset('js/main.js')) ?>?v=2.2"></script>
 </body>
 </html>

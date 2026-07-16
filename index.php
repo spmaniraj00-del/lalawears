@@ -42,7 +42,7 @@ function product_category(array $p): string
         <div class="hero-banner-copy reveal-up">
           <div class="hero-brand-lockup">
             <img class="hero-brand-logo" src="<?= e(site_logo_url()) ?>" alt="">
-            <h1 class="hero-brand-name">lala<span>wears</span><small>.co.in</small></h1>
+            <h1 class="hero-brand-name">lala<span>wears</span><small>.com</small></h1>
           </div>
           <p class="hero-tagline">Best Styles, For Everyone</p>
 
@@ -95,7 +95,7 @@ function product_category(array $p): string
             </span>
             <a class="hero-link" href="<?= e(INSTAGRAM_URL) ?>" target="_blank" rel="noopener">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
-              /www.lalawearscraftedforstyle.com
+              lalawears.co.in
             </a>
           </div>
         </div>

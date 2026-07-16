@@ -211,8 +211,14 @@ function star_row(float $avg): string
         <?php foreach ($reviews as $rev): ?>
           <article class="review-item">
             <div class="review-avatar">
-              <?php if (!empty($rev['user_avatar'])): ?>
-                <img src="<?= e($rev['user_avatar']) ?>" alt="">
+              <?php
+                $revAvatar = trim((string) ($rev['user_avatar'] ?? ''));
+                if ($revAvatar !== '' && !str_starts_with($revAvatar, 'http')) {
+                    $revAvatar = asset(ltrim($revAvatar, '/'));
+                }
+              ?>
+              <?php if ($revAvatar !== ''): ?>
+                <img src="<?= e($revAvatar) ?>" alt="" referrerpolicy="no-referrer">
               <?php else: ?>
                 <span><?= e(strtoupper(mb_substr($rev['user_name'], 0, 1))) ?></span>
               <?php endif; ?>

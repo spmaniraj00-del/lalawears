@@ -10,8 +10,6 @@ if ($user['role'] === 'admin') {
 $pdo = db();
 $uid = (int) $user['id'];
 
-$totalOrders = (int) $pdo->prepare('SELECT COUNT(*) FROM orders WHERE user_id = ?')
-    ->execute([$uid]) ?: 0;
 $stmt = $pdo->prepare('SELECT COUNT(*) FROM orders WHERE user_id = ?');
 $stmt->execute([$uid]);
 $totalOrders = (int) $stmt->fetchColumn();
@@ -38,12 +36,22 @@ require __DIR__ . '/../includes/header.php';
 
 <div class="page-shell">
   <div class="panel wide">
-    <p class="eyebrow">My Account</p>
-    <h1>Hello, <?= e(explode(' ', $user['name'])[0]) ?></h1>
-    <p class="lead">
-      <?= e($user['email']) ?>
-      · Track orders, clothing details, and notifications in one place.
-    </p>
+    <div class="account-hero">
+      <?php $accAvatar = user_avatar_url($user); ?>
+      <?php if ($accAvatar !== ''): ?>
+        <img class="account-avatar" src="<?= e($accAvatar) ?>" alt="<?= e($user['name']) ?>" referrerpolicy="no-referrer" width="88" height="88">
+      <?php else: ?>
+        <span class="account-avatar account-avatar-fallback"><?= e(user_avatar_initial($user)) ?></span>
+      <?php endif; ?>
+      <div>
+        <p class="eyebrow">My Account<?= !empty($user['google_id']) ? ' · Google' : '' ?></p>
+        <h1>Hello, <?= e(explode(' ', $user['name'])[0]) ?></h1>
+        <p class="lead">
+          <?= e($user['email']) ?>
+          · Track orders, clothing details, and notifications in one place.
+        </p>
+      </div>
+    </div>
 
     <div class="account-grid">
       <div class="stat-box"><h3><?= $totalOrders ?></h3><p>Total Orders</p></div>
@@ -52,7 +60,7 @@ require __DIR__ . '/../includes/header.php';
     </div>
 
     <div style="margin-top:28px;display:flex;flex-wrap:wrap;gap:12px;">
-      <a class="btn" href="<?= e(url('index.php')) ?>#collection">Shop Collection</a>
+      <a class="btn" href="<?= e(url('index.php')) ?>#deals">Shop Collection</a>
       <a class="btn-outline" href="<?= e(url('account/notifications.php')) ?>">Notifications<?= $unread ? " ({$unread})" : '' ?></a>
     </div>
 

@@ -17,7 +17,7 @@ $searchQuery = trim((string) ($_GET['q'] ?? ''));
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=League+Spartan:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="<?= e(asset('css/style.css')) ?>?v=2.1">
+  <link rel="stylesheet" href="<?= e(asset('css/style.css')) ?>?v=2.2">
   <link rel="icon" href="<?= e(asset('images/log.png')) ?>">
 </head>
 <body class="<?= e($bodyClass) ?>">
@@ -32,7 +32,7 @@ $searchQuery = trim((string) ($_GET['q'] ?? ''));
 
     <a class="brand" href="<?= e(url('index.php')) ?>#home">
       <img src="<?= e(site_logo_url()) ?>" alt="LALA WEARS logo">
-      <span class="brand-name">LALA<span class="brand-accent">WEARS</span><small>.co.in</small></span>
+      <span class="brand-name">LALA<span class="brand-accent">WEARS</span><small>.com</small></span>
     </a>
 
     <nav class="nav-center" aria-label="Primary">
@@ -55,8 +55,13 @@ $searchQuery = trim((string) ($_GET['q'] ?? ''));
       <div class="nav-account-dropdown">
         <button class="nav-action dropdown-trigger" aria-haspopup="true" aria-expanded="false">
           <span class="nav-action-icon">
-            <?php if ($user && !empty($user['avatar'])): ?>
-              <img src="<?= e($user['avatar']) ?>" alt="" class="nav-avatar">
+            <?php
+              $navAvatar = $user ? user_avatar_url($user) : '';
+            ?>
+            <?php if ($navAvatar !== ''): ?>
+              <img src="<?= e($navAvatar) ?>" alt="" class="nav-avatar" referrerpolicy="no-referrer" width="28" height="28">
+            <?php elseif ($user): ?>
+              <span class="nav-avatar nav-avatar-fallback"><?= e(user_avatar_initial($user)) ?></span>
             <?php else: ?>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -65,13 +70,20 @@ $searchQuery = trim((string) ($_GET['q'] ?? ''));
             <?php endif; ?>
             <?php if ($unread > 0): ?><span class="badge-count"><?= $unread > 9 ? '9+' : $unread ?></span><?php endif; ?>
           </span>
-          <span class="nav-action-label">Profile</span>
+          <span class="nav-action-label"><?= $user ? 'Account' : 'Profile' ?></span>
         </button>
         <div class="dropdown-menu">
           <?php if ($user): ?>
             <div class="dropdown-header-user">
-              <span class="user-welcome">Hello, <?= e(explode(' ', $user['name'])[0]) ?></span>
-              <span class="user-sub"><?= e($user['email']) ?></span>
+              <?php if ($navAvatar !== ''): ?>
+                <img class="dropdown-avatar" src="<?= e($navAvatar) ?>" alt="" referrerpolicy="no-referrer" width="44" height="44">
+              <?php else: ?>
+                <span class="dropdown-avatar dropdown-avatar-fallback"><?= e(user_avatar_initial($user)) ?></span>
+              <?php endif; ?>
+              <div class="dropdown-user-text">
+                <span class="user-welcome">Hello, <?= e(explode(' ', $user['name'])[0]) ?></span>
+                <span class="user-sub"><?= e($user['email']) ?></span>
+              </div>
             </div>
             <a href="<?= e(url('account/index.php')) ?>" class="dropdown-item">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>

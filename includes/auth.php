@@ -232,7 +232,7 @@ function login_or_register_google(array $profile): array
     $googleId = (string) ($profile['id'] ?? $profile['sub'] ?? '');
     $email = strtolower(trim((string) ($profile['email'] ?? '')));
     $name = trim((string) ($profile['name'] ?? 'Customer'));
-    $avatar = (string) ($profile['picture'] ?? '');
+    $avatar = normalize_google_avatar((string) ($profile['picture'] ?? ''));
 
     if ($googleId === '' || $email === '') {
         return ['ok' => false, 'error' => 'Google did not return a valid profile.'];
@@ -249,11 +249,9 @@ function login_or_register_google(array $profile): array
         $stmt->execute([$email]);
         $user = $stmt->fetch();
         if ($user) {
-            $pdo->prepare('UPDATE users SET google_id = ?, avatar = ?, name = ?, updated_at = datetime(\'now\',\'localtime\') WHERE id = ?')
-                ->execute([$googleId, $avatar, $name, (int) $user['id']]);
-            $stmt = $pdo->prepare('SELECT * FROM users WHERE id = ?');
-            $stmt->execute([(int) $user['id']]);
-            $user = $stmt->fetch();
+            $pdo->prepare(
+                "UPDATE users SET google_id = ?, avatar = ?, name = ?, updated_at = datetime('now','localtime') WHERE id = ?"
+            )->execute([$googleId, $avatar, $name, (int) $user['id']]);
         }
     }
 
@@ -263,24 +261,48 @@ function login_or_register_google(array $profile): array
              VALUES (?, ?, ?, ?, ?, ?)'
         )->execute([$name, $email, $googleId, $avatar, '', 'user']);
         $id = (int) $pdo->lastInsertId();
-        $stmt = $pdo->prepare('SELECT * FROM users WHERE id = ?');
-        $stmt->execute([$id]);
-        $user = $stmt->fetch();
-
         notify_user(
             $id,
             'Welcome to LALA WEARS',
             'Your account is ready. Browse the collection and place your first order.',
             'account/index.php'
         );
+        $stmt = $pdo->prepare('SELECT * FROM users WHERE id = ?');
+        $stmt->execute([$id]);
+        $user = $stmt->fetch();
+    } else {
+        // Returning Google user — always refresh name + Gmail photo
+        $pdo->prepare(
+            "UPDATE users SET avatar = ?, name = ?, email = ?, updated_at = datetime('now','localtime') WHERE id = ?"
+        )->execute([$avatar, $name, $email, (int) $user['id']]);
+        $stmt = $pdo->prepare('SELECT * FROM users WHERE id = ?');
+        $stmt->execute([(int) $user['id']]);
+        $user = $stmt->fetch();
     }
 
-    if (!(int) $user['is_active']) {
+    if (!$user || !(int) $user['is_active']) {
         return ['ok' => false, 'error' => 'This account is disabled.'];
     }
 
     login_user($user);
     return ['ok' => true, 'user' => $user];
+}
+
+/** Prefer a crisp square Google profile photo URL. */
+function normalize_google_avatar(string $url): string
+{
+    $url = trim($url);
+    if ($url === '') {
+        return '';
+    }
+    // Google photo URLs often end with =s96-c — bump size for sharper UI
+    if (str_contains($url, 'googleusercontent.com')) {
+        $url = preg_replace('/=s\d+-c$/', '=s256-c', $url) ?? $url;
+        if (!str_contains($url, '=s')) {
+            $url .= (str_contains($url, '?') ? '&' : '') . 'sz=256';
+        }
+    }
+    return $url;
 }
 
 function attempt_user_login(string $emailOrPhone, string $password): array
