@@ -1,0 +1,27 @@
+# Protect sensitive directories
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Block direct access to config, includes, data
+  RewriteRule ^(config|includes|data)/ - [F,L]
+
+  # Block SQL Injection & XSS query strings
+  RewriteCond %{QUERY_STRING} [^a-z](union|select|insert|update|delete|drop|alter|create|truncate|concat|char|load_file|union\s+select)[^a-z] [NC,OR]
+  RewriteCond %{QUERY_STRING} (<|%3C).*script.*(>|%3E) [NC,OR]
+  RewriteCond %{QUERY_STRING} (javascript:|onerror|onload|onmouseover) [NC]
+  RewriteRule ^(.*)$ - [F,L]
+</IfModule>
+
+# Deny access to SQLite DB if rewrite fails
+<FilesMatch "\.(sqlite|sqlite3|db|sql)$">
+  Require all denied
+</FilesMatch>
+
+# Security headers (Apache)
+<IfModule mod_headers.c>
+  Header set X-Frame-Options "SAMEORIGIN"
+  Header set X-Content-Type-Options "nosniff"
+  Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>

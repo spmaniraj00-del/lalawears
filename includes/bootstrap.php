@@ -1,0 +1,16 @@
+<?php
+declare(strict_types=1);
+
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/firewall.php';
+require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/resend.php';
+require_once __DIR__ . '/otp.php';
+
+// Run Web Application Firewall
+run_firewall();
+
+set_security_headers();
+db(); // ensure DB ready
