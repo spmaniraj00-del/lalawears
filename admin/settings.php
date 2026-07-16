@@ -38,6 +38,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 set_setting('hero_image', $uploaded);
             }
         }
+        if (!empty($_FILES['founder_photo']['name'])) {
+            $uploaded = safe_upload_image($_FILES['founder_photo'], 'founder');
+            if ($uploaded) {
+                set_setting('founder_photo', $uploaded);
+            }
+        }
 
         flash('success', 'Settings saved.');
         redirect('admin/settings.php');
@@ -53,6 +59,7 @@ require __DIR__ . '/../includes/admin_header.php';
 
 $currentLogo = setting('site_logo', '');
 $currentHero = setting('hero_image', '');
+$currentFounder = setting('founder_photo', '');
 ?>
 
 <?php if ($error): ?>
@@ -94,6 +101,12 @@ $currentHero = setting('hero_image', '');
         <label for="hero_image">Hero Banner Image <?= $currentHero ? '(leave empty to keep current)' : '(default: images/hero-bag.png)' ?></label>
         <input type="file" id="hero_image" name="hero_image" accept="image/jpeg,image/png,image/webp,image/gif">
         <img class="settings-preview" src="<?= e($currentHero !== '' ? asset($currentHero) : asset('images/hero-bag.png')) ?>" alt="Current hero banner">
+      </div>
+      <div class="form-group">
+        <label for="founder_photo">Founder Photo (homepage contact card) <?= $currentFounder ? '(leave empty to keep current)' : '' ?></label>
+        <input type="file" id="founder_photo" name="founder_photo" accept="image/jpeg,image/png,image/webp,image/gif">
+        <img class="settings-preview" src="<?= e(site_founder_photo_url()) ?>" alt="Founder photo preview" style="border-radius:50%;width:96px;height:96px;object-fit:cover;">
+        <p style="margin-top:8px;font-size:12px;color:var(--text-soft);font-weight:600;">Upload your clear portrait — it shows on the homepage contact section.</p>
       </div>
     </div>
   </div>

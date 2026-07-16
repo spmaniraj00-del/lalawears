@@ -94,6 +94,9 @@ function attempt_admin_login(string $username, string $password): array
 
 function google_oauth_url(): string
 {
+    $state = bin2hex(random_bytes(24));
+    $_SESSION['google_oauth_state'] = $state;
+
     $params = [
         'client_id' => GOOGLE_CLIENT_ID,
         'redirect_uri' => app_absolute_url('auth/google_callback.php'),
@@ -101,9 +104,30 @@ function google_oauth_url(): string
         'scope' => 'openid email profile',
         'access_type' => 'online',
         'prompt' => 'select_account',
-        'state' => csrf_token(),
+        'include_granted_scopes' => 'true',
+        'state' => $state,
     ];
     return 'https://accounts.google.com/o/oauth2/v2/auth?' . http_build_query($params);
+}
+
+function google_oauth_state_valid(?string $state): bool
+{
+    $expected = (string) ($_SESSION['google_oauth_state'] ?? '');
+    unset($_SESSION['google_oauth_state']);
+    return $expected !== '' && is_string($state) && hash_equals($expected, $state);
+}
+
+function curl_ssl_opts(): array
+{
+    $opts = [
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_SSL_VERIFYHOST => 2,
+    ];
+    $cacert = APP_ROOT . '/config/cacert.pem';
+    if (is_file($cacert)) {
+        $opts[CURLOPT_CAINFO] = $cacert;
+    }
+    return $opts;
 }
 
 function http_post_form(string $url, array $data): array
@@ -117,7 +141,7 @@ function http_post_form(string $url, array $data): array
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded'],
             CURLOPT_TIMEOUT => 20,
-        ]);
+        ] + curl_ssl_opts());
         $raw = curl_exec($ch);
         $err = curl_error($ch);
         $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -140,6 +164,11 @@ function http_post_form(string $url, array $data): array
             'timeout' => 20,
             'ignore_errors' => true,
         ],
+        'ssl' => [
+            'verify_peer' => true,
+            'verify_peer_name' => true,
+            'cafile' => is_file(APP_ROOT . '/config/cacert.pem') ? APP_ROOT . '/config/cacert.pem' : null,
+        ],
     ]);
     $raw = file_get_contents($url, false, $ctx);
     if ($raw === false) {
@@ -160,11 +189,12 @@ function http_get_json(string $url, string $accessToken): array
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $accessToken],
             CURLOPT_TIMEOUT => 20,
-        ]);
+        ] + curl_ssl_opts());
         $raw = curl_exec($ch);
+        $err = curl_error($ch);
         curl_close($ch);
         if ($raw === false) {
-            throw new RuntimeException('Could not fetch Google profile.');
+            throw new RuntimeException('Could not fetch Google profile: ' . $err);
         }
         $json = json_decode($raw, true);
         if (!is_array($json)) {
@@ -179,6 +209,11 @@ function http_get_json(string $url, string $accessToken): array
             'header' => "Authorization: Bearer {$accessToken}\r\n",
             'timeout' => 20,
             'ignore_errors' => true,
+        ],
+        'ssl' => [
+            'verify_peer' => true,
+            'verify_peer_name' => true,
+            'cafile' => is_file(APP_ROOT . '/config/cacert.pem') ? APP_ROOT . '/config/cacert.pem' : null,
         ],
     ]);
     $raw = file_get_contents($url, false, $ctx);

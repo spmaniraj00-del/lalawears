@@ -496,6 +496,26 @@ html {
   z-index: 0 !important;
 }
 
+.otp-google-hint {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-faint);
+}
+
+.recaptcha-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 18px;
+  min-height: 78px;
+}
+
+.google-btn svg {
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
 /* Small phones: keep the 6 OTP boxes on one row */
 @media (max-width: 400px) {
   .otp-inputs { gap: 6px; margin-top: 22px; }

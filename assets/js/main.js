@@ -33,7 +33,38 @@ document.addEventListener('DOMContentLoaded', () => {
   initQtyStepper();
   initReviewModal();
   initCheckoutSummary();
+  initFounderCard();
 });
+
+function initFounderCard() {
+  const card = document.querySelector('[data-founder-card]');
+  if (!card) return;
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduceMotion || window.matchMedia('(hover: none)').matches) return;
+
+  let raf = 0;
+  const setFromEvent = (e) => {
+    const rect = card.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    const fx = (x - 0.5) * 2;
+    const fy = (y - 0.5) * 2;
+    card.style.setProperty('--fx', fx.toFixed(3));
+    card.style.setProperty('--fy', fy.toFixed(3));
+  };
+
+  card.addEventListener('pointermove', (e) => {
+    if (raf) cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => setFromEvent(e));
+  });
+
+  card.addEventListener('pointerleave', () => {
+    if (raf) cancelAnimationFrame(raf);
+    card.style.setProperty('--fx', '0');
+    card.style.setProperty('--fy', '0');
+  });
+}
 
 function initCheckoutSummary() {
   const form = document.querySelector('.checkout-grid[data-price]');

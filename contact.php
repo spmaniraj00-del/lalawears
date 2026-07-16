@@ -27,6 +27,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Please write your message (at least 5 characters).';
     } elseif (mb_strlen($old['message']) > 2000) {
         $error = 'Message is too long (max 2000 characters).';
+    } elseif (!verify_recaptcha()) {
+        $error = 'Please complete the reCAPTCHA check.';
     } else {
         $threadKey = support_thread_key($user, $old['email']);
         add_support_message(
@@ -119,6 +121,7 @@ require __DIR__ . '/includes/header.php';
           <label for="c-message">Message</label>
           <textarea id="c-message" name="message" required maxlength="2000" placeholder="How can we help you?"><?= e($old['message']) ?></textarea>
         </div>
+        <?= recaptcha_widget_html() ?>
         <button type="submit" class="contact-send-btn">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
           Send Message
@@ -128,4 +131,5 @@ require __DIR__ . '/includes/header.php';
   </div>
 </main>
 
+<?= recaptcha_script_tag() ?>
 <?php require __DIR__ . '/includes/footer.php'; ?>

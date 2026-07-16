@@ -171,7 +171,17 @@ function set_security_headers(): void
     header('X-Frame-Options: SAMEORIGIN');
     header('X-Content-Type-Options: nosniff');
     header('Referrer-Policy: strict-origin-when-cross-origin');
-    header("Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://lh3.googleusercontent.com https://*.googleusercontent.com; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.resend.com; frame-ancestors 'self';");
+    header(
+        "Content-Security-Policy: default-src 'self'; "
+        . "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://www.gstatic.com; "
+        . "font-src 'self' https://fonts.gstatic.com data:; "
+        . "img-src 'self' data: blob: https://lh3.googleusercontent.com https://*.googleusercontent.com https://www.gstatic.com https://www.google.com; "
+        . "script-src 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com; "
+        . "connect-src 'self' https://api.resend.com https://www.google.com https://accounts.google.com https://oauth2.googleapis.com; "
+        . "frame-src https://www.google.com https://accounts.google.com; "
+        . "form-action 'self' https://accounts.google.com; "
+        . "frame-ancestors 'self';"
+    );
     // Tell browsers to prefer HTTPS after the first secure visit
     if (function_exists('request_is_https') && request_is_https() && !is_local_request_host()) {
         header('Strict-Transport-Security: max-age=31536000; includeSubDomains; preload');
@@ -286,6 +296,17 @@ function site_logo_url(): string
 {
     $logo = setting('site_logo', '');
     return $logo !== '' ? asset($logo) : asset('images/log.png');
+}
+
+function site_founder_photo_url(): string
+{
+    $photo = setting('founder_photo', '');
+    return $photo !== '' ? asset($photo) : asset('images/log.png');
+}
+
+function site_founder_has_photo(): bool
+{
+    return setting('founder_photo', '') !== '';
 }
 
 /* ——— Support chat ——— */

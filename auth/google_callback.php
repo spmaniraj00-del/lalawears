@@ -16,7 +16,7 @@ if ($error) {
 $code = $_GET['code'] ?? '';
 $state = $_GET['state'] ?? '';
 
-if ($code === '' || !verify_csrf($state)) {
+if ($code === '' || !google_oauth_state_valid(is_string($state) ? $state : null)) {
     flash('error', 'Invalid Google sign-in response. Please try again.');
     redirect('auth/login.php');
 }

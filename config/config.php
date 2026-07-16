@@ -29,6 +29,8 @@ $__local = [
     'GOOGLE_CLIENT_SECRET' => getenv('GOOGLE_CLIENT_SECRET') ?: '',
     'RESEND_API_KEY' => getenv('RESEND_API_KEY') ?: '',
     'RESEND_FROM' => getenv('RESEND_FROM') ?: 'onboarding@resend.dev',
+    'RECAPTCHA_SITE_KEY' => getenv('RECAPTCHA_SITE_KEY') ?: '',
+    'RECAPTCHA_SECRET_KEY' => getenv('RECAPTCHA_SECRET_KEY') ?: '',
     'OTP_SHOW_ON_SITE' => true,
 ];
 $localFile = APP_ROOT . '/config/config.local.php';
@@ -53,6 +55,8 @@ define(
 );
 define('RESEND_API_KEY', (string) ($__local['RESEND_API_KEY'] ?? ''));
 define('RESEND_FROM', (string) (($__local['RESEND_FROM'] ?? '') !== '' ? $__local['RESEND_FROM'] : 'onboarding@resend.dev'));
+define('RECAPTCHA_SITE_KEY', (string) ($__local['RECAPTCHA_SITE_KEY'] ?? ''));
+define('RECAPTCHA_SECRET_KEY', (string) ($__local['RECAPTCHA_SECRET_KEY'] ?? ''));
 define('OTP_LENGTH', 6);
 define('OTP_EXPIRY_MINUTES', 5);
 define('OTP_RESEND_SECONDS', 30);
