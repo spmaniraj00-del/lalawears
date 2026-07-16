@@ -2,6 +2,6 @@
       </div>
     </div>
   </div>
-  <script src="<?= e(asset('js/main.js')) ?>?v=2.4"></script>
+  <script src="<?= e(asset('js/main.js')) ?>?v=2.6"></script>
 </body>
 </html>

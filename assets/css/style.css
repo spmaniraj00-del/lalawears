@@ -782,8 +782,8 @@ a { color: inherit; text-decoration: none; }
 .deal-media {
   position: relative;
   display: block;
-  aspect-ratio: 1 / 1;
-  background: var(--bg-soft);
+  aspect-ratio: 4 / 5;
+  background: #f0ebe6;
   overflow: hidden;
 }
 .deal-media-wrap {
@@ -792,18 +792,42 @@ a { color: inherit; text-decoration: none; }
 .deal-media img {
   position: absolute;
   inset: 0;
-  width: 100%; height: 100%;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  object-position: center top;
+  object-position: center center;
   opacity: 0;
-  transition: opacity 0.45s var(--ease), transform 0.6s var(--ease);
+  transition: opacity 0.55s var(--ease);
   pointer-events: none;
+  z-index: 0;
 }
 .deal-media img.is-active {
   opacity: 1;
   z-index: 1;
 }
-.deal-card:hover .deal-media img.is-active { transform: scale(1.04); }
+.deal-media-dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 10px;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  pointer-events: none;
+}
+.deal-media-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: background 0.25s ease, transform 0.25s ease;
+}
+.deal-media-dots span.is-active {
+  background: #fff;
+  transform: scale(1.2);
+}
 .deal-wish-form {
   position: absolute;
   top: 10px;
@@ -2033,10 +2057,7 @@ table.data img.thumb {
   border: 1px solid rgba(38, 38, 38, 0.10);
   border-radius: 18px;
   background: #fff;
-  padding: 18px;
   aspect-ratio: 1 / 1;
-  display: grid;
-  place-items: center;
   overflow: hidden;
   position: relative;
   touch-action: pan-y;
@@ -2045,11 +2066,15 @@ table.data img.thumb {
 }
 .product-gallery-frame:active { cursor: grabbing; }
 .product-gallery-frame .gallery-main {
-  grid-area: 1 / 1;
-  width: 100%;
-  height: 100%;
-  max-height: 100%;
+  position: absolute;
+  inset: 16px;
+  width: auto;
+  height: auto;
+  max-width: calc(100% - 32px);
+  max-height: calc(100% - 32px);
+  margin: auto;
   object-fit: contain;
+  object-position: center center;
   border-radius: 10px;
   opacity: 0;
   transition: opacity 0.35s var(--ease);
@@ -4324,7 +4349,6 @@ table.admin-table img.athumb {
 
   /* Hover-only effects can "stick" after a tap — neutralise the risky ones */
   .deal-card:hover { transform: none; box-shadow: none; }
-  .deal-card:hover .deal-media img.is-active { transform: none; }
   .portfolio-item:hover .portfolio-media img { filter: grayscale(100%); transform: none; }
   .portfolio-item:hover .view-case { opacity: 0; }
   .craft-card:hover { background: var(--bg); }

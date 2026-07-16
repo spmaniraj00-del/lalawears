@@ -150,8 +150,15 @@ function product_category(array $p): string
           <div class="deal-media-wrap">
             <a class="deal-media" href="<?= e($productUrl) ?>" data-hover-slide>
               <?php foreach ($gallery as $i => $imgPath): ?>
-                <img src="<?= e(product_image_url($imgPath)) ?>" alt="<?= e($product['name']) ?>" loading="lazy" class="<?= $i === 0 ? 'is-active' : '' ?>">
+                <img src="<?= e(product_image_url($imgPath)) ?>" alt="<?= e($product['name']) ?>" <?= $i === 0 ? '' : 'loading="lazy"' ?> class="<?= $i === 0 ? 'is-active' : '' ?>">
               <?php endforeach; ?>
+              <?php if (count($gallery) > 1): ?>
+                <div class="deal-media-dots" aria-hidden="true">
+                  <?php foreach ($gallery as $i => $_): ?>
+                    <span class="<?= $i === 0 ? 'is-active' : '' ?>"></span>
+                  <?php endforeach; ?>
+                </div>
+              <?php endif; ?>
               <span class="deal-tag">Premium</span>
             </a>
             <form method="post" action="<?= e(url('wishlist.php')) ?>" class="deal-wish-form">

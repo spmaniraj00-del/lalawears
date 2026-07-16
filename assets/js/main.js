@@ -39,29 +39,64 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initHoverSlides() {
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   document.querySelectorAll('[data-hover-slide]').forEach((el) => {
     const imgs = Array.from(el.querySelectorAll('img'));
-    if (imgs.length < 2) return;
+    if (imgs.length < 2) {
+      if (imgs[0]) imgs[0].classList.add('is-active');
+      return;
+    }
+
     let idx = 0;
     let timer = null;
+    let dotsWrap = el.querySelector('.deal-media-dots');
+    if (!dotsWrap) {
+      dotsWrap = document.createElement('div');
+      dotsWrap.className = 'deal-media-dots';
+      dotsWrap.setAttribute('aria-hidden', 'true');
+      imgs.forEach((_, i) => {
+        const dot = document.createElement('span');
+        if (i === 0) dot.classList.add('is-active');
+        dotsWrap.appendChild(dot);
+      });
+      el.appendChild(dotsWrap);
+    }
+    const dots = Array.from(dotsWrap.querySelectorAll('span'));
+
     const show = (n) => {
-      imgs.forEach((img, i) => img.classList.toggle('is-active', i === n));
-      idx = n;
+      idx = ((n % imgs.length) + imgs.length) % imgs.length;
+      imgs.forEach((img, i) => img.classList.toggle('is-active', i === idx));
+      dots.forEach((dot, i) => dot.classList.toggle('is-active', i === idx));
     };
-    show(0);
-    const start = () => {
-      stop();
-      timer = setInterval(() => show((idx + 1) % imgs.length), 900);
-    };
+
     const stop = () => {
       if (timer) clearInterval(timer);
       timer = null;
-      show(0);
     };
-    el.addEventListener('mouseenter', start);
-    el.addEventListener('mouseleave', stop);
-    el.addEventListener('focusin', start);
-    el.addEventListener('focusout', stop);
+    const start = () => {
+      if (reduceMotion) return;
+      stop();
+      timer = setInterval(() => show(idx + 1), 3000);
+    };
+
+    show(0);
+
+    // Auto-slide every 3s when card is on screen
+    if ('IntersectionObserver' in window) {
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) start();
+          else stop();
+        });
+      }, { threshold: 0.35 });
+      io.observe(el);
+    } else {
+      start();
+    }
+
+    // Pause while hovering so user can click Buy
+    el.addEventListener('mouseenter', stop);
+    el.addEventListener('mouseleave', start);
   });
 }
 
