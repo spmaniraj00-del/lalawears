@@ -98,8 +98,8 @@ function request_phone_otp(string $phone, string $email, string $name = ''): arr
         . '</div>';
 
     $sent = ['ok' => false, 'error' => ''];
-    if (resend_configured()) {
-        $sent = resend_send_email(
+    if (mailer_configured()) {
+        $sent = send_app_email(
             $email,
             'Your LALA WEARS code: ' . $code,
             $html

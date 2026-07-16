@@ -11,6 +11,7 @@ require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/resend.php';
+require_once __DIR__ . '/mailer.php';
 require_once __DIR__ . '/otp.php';
 require_once __DIR__ . '/recaptcha.php';
 

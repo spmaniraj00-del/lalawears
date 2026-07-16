@@ -426,10 +426,7 @@ function send_password_reset_link(string $email): array
           . '<p style="color:#8a8a8a; font-size:12px; margin-top:30px;">If you did not request this, ignore this email.</p>'
           . '</div>';
 
-    $sent = ['ok' => false, 'error' => 'Email service is not configured.'];
-    if (resend_configured()) {
-        $sent = resend_send_email($email, $subject, $html);
-    }
+    $sent = send_app_email($email, $subject, $html);
 
     // Always show link on page as backup (Resend free sender often blocks other Gmails)
     if (!empty($sent['ok'])) {
@@ -443,8 +440,8 @@ function send_password_reset_link(string $email): array
     }
 
     $apiError = trim((string) ($sent['error'] ?? ''));
-    $hint = 'Resend free sender (onboarding@resend.dev) usually only delivers to the Gmail linked to your Resend account. '
-        . 'Other Gmails will not receive the mail until you verify your domain in Resend.';
+    $hint = 'Add Gmail App Password in config (SMTP_PASS) so any Gmail can receive, '
+        . 'or verify domain at resend.com/domains. Until then only sunnyrajspmaniraj@gmail.com can get Resend test mail.';
 
     return [
         'ok' => true,

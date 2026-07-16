@@ -29,6 +29,12 @@ $__local = [
     'GOOGLE_CLIENT_SECRET' => getenv('GOOGLE_CLIENT_SECRET') ?: '',
     'RESEND_API_KEY' => getenv('RESEND_API_KEY') ?: '',
     'RESEND_FROM' => getenv('RESEND_FROM') ?: 'onboarding@resend.dev',
+    'SMTP_HOST' => getenv('SMTP_HOST') ?: 'smtp.gmail.com',
+    'SMTP_PORT' => getenv('SMTP_PORT') ?: '587',
+    'SMTP_USER' => getenv('SMTP_USER') ?: '',
+    'SMTP_PASS' => getenv('SMTP_PASS') ?: '',
+    'MAIL_FROM' => getenv('MAIL_FROM') ?: '',
+    'MAIL_FROM_NAME' => getenv('MAIL_FROM_NAME') ?: 'LALA WEARS',
     'RECAPTCHA_SITE_KEY' => getenv('RECAPTCHA_SITE_KEY') ?: '',
     'RECAPTCHA_SECRET_KEY' => getenv('RECAPTCHA_SECRET_KEY') ?: '',
     'OTP_SHOW_ON_SITE' => true,
@@ -55,6 +61,12 @@ define(
 );
 define('RESEND_API_KEY', (string) ($__local['RESEND_API_KEY'] ?? ''));
 define('RESEND_FROM', (string) (($__local['RESEND_FROM'] ?? '') !== '' ? $__local['RESEND_FROM'] : 'onboarding@resend.dev'));
+define('SMTP_HOST', (string) ($__local['SMTP_HOST'] ?? 'smtp.gmail.com'));
+define('SMTP_PORT', (int) ($__local['SMTP_PORT'] ?? 587));
+define('SMTP_USER', (string) ($__local['SMTP_USER'] ?? ''));
+define('SMTP_PASS', (string) ($__local['SMTP_PASS'] ?? ''));
+define('MAIL_FROM', (string) (($__local['MAIL_FROM'] ?? '') !== '' ? $__local['MAIL_FROM'] : ($__local['SMTP_USER'] ?? '')));
+define('MAIL_FROM_NAME', (string) (($__local['MAIL_FROM_NAME'] ?? '') !== '' ? $__local['MAIL_FROM_NAME'] : 'LALA WEARS'));
 define('RECAPTCHA_SITE_KEY', (string) ($__local['RECAPTCHA_SITE_KEY'] ?? ''));
 define('RECAPTCHA_SECRET_KEY', (string) ($__local['RECAPTCHA_SECRET_KEY'] ?? ''));
 define('OTP_LENGTH', 6);
