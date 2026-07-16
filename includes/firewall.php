@@ -8,12 +8,18 @@ declare(strict_types=1);
 
 function run_firewall(): void
 {
+    $uriPath = (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/');
+    // Never block Railway / uptime health probes
+    if ($uriPath === '/healthz' || $uriPath === '/health') {
+        return;
+    }
+
     // 1. Blacklisted User Agents (Scanners and automated tools)
     $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
     $blockedAgents = [
-        'sqlmap', 'acunetix', 'nikto', 'dirbuster', 'nmap', 'havij', 
-        'w3af', 'netsparker', 'censys', 'shodan', 'wget', 'python', 
-        'perl', 'libwww', 'curl' // curl is commonly blocked but can be allowed if needed
+        'sqlmap', 'acunetix', 'nikto', 'dirbuster', 'nmap', 'havij',
+        'w3af', 'netsparker', 'censys', 'shodan',
+        // NOTE: do NOT block curl/wget — Railway healthchecks use them
     ];
 
     foreach ($blockedAgents as $agent) {

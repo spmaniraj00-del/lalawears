@@ -4,12 +4,17 @@ Options -Indexes
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
-  # Force HTTPS (Apache / shared hosting). Skip localhost.
+  # Force HTTPS + www (Apache). Skip localhost.
+  # Canonical host: www.lalawearscraftedforstyle.com
   RewriteCond %{HTTP_HOST} !^localhost [NC]
   RewriteCond %{HTTP_HOST} !^127\.0\.0\.1 [NC]
+  RewriteCond %{HTTP_HOST} !^www\.lalawearscraftedforstyle\.com$ [NC]
+  RewriteRule ^ https://www.lalawearscraftedforstyle.com%{REQUEST_URI} [L,R=301]
+
+  RewriteCond %{HTTP_HOST} ^www\.lalawearscraftedforstyle\.com$ [NC]
   RewriteCond %{HTTPS} !=on
   RewriteCond %{HTTP:X-Forwarded-Proto} !https [NC]
-  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+  RewriteRule ^ https://www.lalawearscraftedforstyle.com%{REQUEST_URI} [L,R=301]
 
   # Block direct access to config, includes, data
   RewriteRule ^(config|includes|data)/ - [F,L]

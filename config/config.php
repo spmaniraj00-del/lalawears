@@ -114,26 +114,53 @@ function is_local_request_host(?string $host = null): bool
 }
 
 /**
- * Force browsers onto HTTPS in production (fixes "Not secure" when visiting http://).
- * Skip localhost. Set env FORCE_HTTPS=0 to disable.
+ * Force browsers onto HTTPS + canonical host (www) in production.
+ * Only for public edge traffic (Cloudflare / Railway proxy).
+ * Never redirect Railway internal healthchecks (no X-Forwarded-Proto).
  */
 function force_https_redirect(): void
 {
     if (PHP_SAPI === 'cli') {
         return;
     }
-    $flag = strtolower((string) (getenv('FORCE_HTTPS') ?: ''));
-    if ($flag === '0' || $flag === 'false' || $flag === 'off') {
-        return;
-    }
     if (is_local_request_host()) {
         return;
     }
-    if (request_is_https()) {
+
+    $uriPath = (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/');
+    if ($uriPath === '/healthz' || $uriPath === '/health') {
         return;
     }
+
+    // Internal probe / direct container hit — do not redirect
+    $forwardedProto = strtolower(trim((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')));
+    if ($forwardedProto === '') {
+        return;
+    }
+    if (str_contains($forwardedProto, ',')) {
+        $forwardedProto = trim(explode(',', $forwardedProto, 2)[0]);
+    }
+
     $uri = (string) ($_SERVER['REQUEST_URI'] ?? '/');
-    header('Location: https://' . request_host() . $uri, true, 301);
+    $currentHost = strtolower(explode(':', request_host(), 2)[0]);
+
+    $canonicalHost = '';
+    if (defined('APP_URL') && APP_URL !== '') {
+        $canonicalHost = strtolower((string) (parse_url(APP_URL, PHP_URL_HOST) ?: ''));
+    }
+
+    $forceHttps = !in_array(strtolower((string) (getenv('FORCE_HTTPS') ?: '')), ['0', 'false', 'off'], true);
+    $forceHost = !in_array(strtolower((string) (getenv('FORCE_CANONICAL_HOST') ?: '')), ['0', 'false', 'off'], true);
+
+    $needsHttps = $forceHttps && $forwardedProto === 'http';
+    $needsHost = $forceHost && $canonicalHost !== '' && $currentHost !== $canonicalHost;
+
+    if (!$needsHttps && !$needsHost) {
+        return;
+    }
+
+    $targetHost = ($needsHost && $canonicalHost !== '') ? $canonicalHost : $currentHost;
+    header('Location: https://' . $targetHost . $uri, true, 301);
     exit;
 }
 
@@ -183,7 +210,7 @@ function asset(string $path): string
 
 function app_absolute_url(string $path = ''): string
 {
-    // Optional override: APP_URL=https://lalawearscraftedforstyle.com
+    // Canonical public site URL (www on Cloudflare / GoDaddy)
     if (APP_URL !== '') {
         return APP_URL . url($path);
     }

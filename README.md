@@ -24,28 +24,50 @@ Important:
 - Add a **Volume** at `/app/data` so orders/users survive redeploys.
 - Optional volume: `/app/assets/uploads` for uploaded images.
 
-### Custom domain + HTTPS (fix “Not secure”)
+### Custom domain + HTTPS (www + Cloudflare + Railway)
 
-Browsers show **Not secure** when the site is opened over plain `http://` or the SSL certificate is missing.
+Your live URL is:
 
-Railway issues a free Let’s Encrypt certificate for custom domains automatically once DNS is correct.
+**`https://www.lalawearscraftedforstyle.com`**
 
-1. In Railway → your service → **Settings** → **Networking** → **Custom Domain**.
-2. Add `lalawearscraftedforstyle.com` (and `www` if you use it).
-3. In your DNS provider, add **both** records Railway shows:
-   - **CNAME** (or ALIAS / CNAME flattening for the root domain) → Railway target
-   - **TXT** verification record (required — without it SSL will not issue)
-4. Wait until Railway shows the domain as verified and the certificate as **Issued**.
-5. Open **`https://lalawearscraftedforstyle.com`** (not `http://`).
-6. Optional Railway variables (recommended):
-   - `APP_URL` = `https://lalawearscraftedforstyle.com`
-   - `FORCE_HTTPS` = `1` (default behaviour already redirects HTTP → HTTPS in production)
+GoDaddy root domains often fail as a plain CNAME. Use **www** as the main site.
 
-If you use **Cloudflare**:
-- SSL/TLS mode = **Full** (not Flexible, not Full Strict)
-- During first certificate issue, set the orange cloud to **DNS only**, wait for Railway SSL, then turn proxy back on
+#### 1) Railway
+1. Service → **Settings** → **Networking** → **Custom Domain**
+2. Add **`www.lalawearscraftedforstyle.com`** (this is the important one)
+3. Optional: also add bare `lalawearscraftedforstyle.com` only if Railway gives you a valid record for it
+4. Copy the **CNAME** + **TXT** values Railway shows for `www`
 
-Also update Google OAuth redirect URIs to the `https://` domain if Google Sign-In is enabled.
+#### 2) Cloudflare DNS (recommended)
+Nameservers at GoDaddy should point to Cloudflare.
+
+| Type | Name | Target | Proxy |
+|------|------|--------|-------|
+| CNAME | `www` | Railway target (e.g. `xxxx.up.railway.app`) | Proxied (orange) after SSL works |
+| TXT | `_railway` / value Railway shows | Railway verification value | DNS only |
+| CNAME | `@` (root) | `www.lalawearscraftedforstyle.com` | Proxied (Cloudflare CNAME flattening) |
+
+Cloudflare SSL/TLS:
+- Mode = **Full**
+- First-time SSL: set `www` to **DNS only** (grey cloud), wait until Railway says certificate **Issued**, then turn orange cloud back on
+
+#### 3) Cloudflare redirect (root → www)
+Rules → Redirect Rules → create:
+
+- If hostname equals `lalawearscraftedforstyle.com`
+- Then dynamic redirect to `https://www.lalawearscraftedforstyle.com/${uri}`
+- Status **301**
+
+#### 4) App / Railway variables
+- `APP_URL` = `https://www.lalawearscraftedforstyle.com`
+- `FORCE_HTTPS` = `1`
+- `FORCE_CANONICAL_HOST` = `1` (redirects bare domain → www)
+
+#### 5) Google OAuth
+Add authorized redirect URI:
+`https://www.lalawearscraftedforstyle.com/auth/google_callback.php`
+
+Open the site only as **`https://www.lalawearscraftedforstyle.com`**.
 
 ## Customer login (Phone + OTP)
 

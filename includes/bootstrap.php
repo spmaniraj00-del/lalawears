@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config/config.php';
 
-// Production: always serve over HTTPS (Railway / custom domain)
+// Production: HTTPS + canonical www host (GoDaddy / Cloudflare / Railway)
 force_https_redirect();
 
 require_once __DIR__ . '/firewall.php';
