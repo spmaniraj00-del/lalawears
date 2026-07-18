@@ -25,6 +25,43 @@ if ($user['role'] !== 'admin' && (int) $order['user_id'] !== (int) $user['id']) 
     redirect('account/index.php');
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_post_csrf();
+    $action = $_POST['action'] ?? '';
+
+    if ($action === 'submit_payment') {
+        $utr = trim($_POST['utr'] ?? '');
+        if (!preg_match('/^\d{12}$/', $utr)) {
+            flash('error', 'Please enter a valid 12-digit UPI UTR/Transaction Reference Number.');
+        } else {
+            $pdo = db();
+            $pdo->prepare(
+                "UPDATE orders SET
+                    payment_status = 'submitted',
+                    transaction_id = ?,
+                    updated_at = datetime('now','localtime')
+                 WHERE id = ?"
+            )->execute([$utr, $id]);
+
+            add_order_tracking(
+                $id,
+                'pending',
+                'Payment details submitted: UTR ' . $utr . ' · Awaiting admin verification',
+                (string) ($order['city'] ?? '')
+            );
+
+            notify_admins(
+                'Payment submitted for Order #' . $id,
+                'Customer ' . ($order['customer_name'] ?: $user['name']) . ' submitted UTR ' . $utr . ' for ' . money_inr((float) $order['price'] * (int) $order['quantity']),
+                'admin/order_view.php?id=' . $id
+            );
+
+            flash('success', 'Payment details submitted successfully! Awaiting verification.');
+            redirect('account/order_view.php?id=' . $id);
+        }
+    }
+}
+
 $img = $order['product_image'] ?: ($order['live_image'] ?? 'images/ss.png');
 $steps = ['pending', 'confirmed', 'shipped', 'delivered'];
 $statusIndex = array_search($order['status'], $steps, true);
@@ -63,6 +100,10 @@ require __DIR__ . '/../includes/header.php';
           <div class="detail-row"><span>Quantity</span><strong><?= (int) $order['quantity'] ?></strong></div>
           <div class="detail-row"><span>Size</span><strong><?= e($order['size']) ?></strong></div>
           <div class="detail-row"><span>Total</span><strong><?= e(money_inr((float) $order['price'] * (int) $order['quantity'])) ?></strong></div>
+          <div class="detail-row"><span>Payment Method</span><strong><?= ($order['payment_method'] ?? 'cod') === 'upi' ? 'UPI / QR Code' : 'Cash on Delivery' ?></strong></div>
+          <?php if (($order['payment_method'] ?? 'cod') === 'upi' && $order['transaction_id']): ?>
+            <div class="detail-row"><span>UPI UTR / Ref</span><strong><?= e($order['transaction_id']) ?></strong></div>
+          <?php endif; ?>
           <?php if (!empty($order['customer_name'])): ?>
             <div class="detail-row"><span>Name</span><strong><?= e($order['customer_name']) ?></strong></div>
           <?php endif; ?>
@@ -94,6 +135,114 @@ require __DIR__ . '/../includes/header.php';
             <div class="detail-row"><span>Your note</span><strong style="text-align:right;max-width:65%;"><?= e($order['notes']) ?></strong></div>
           <?php endif; ?>
         </div>
+
+        <?php if (($order['payment_method'] ?? 'cod') === 'upi'): ?>
+          <div class="checkout-card payment-card" style="margin-top: 28px; padding: 24px; border: 1.5px solid rgba(26, 115, 232, 0.2); border-radius: 20px; background: #fbfdff; box-shadow: 0 4px 16px rgba(26, 115, 232, 0.04);">
+            <h3 style="font-size: 1.3rem; font-weight: 800; color: #1a73e8; margin-top: 0; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+              UPI Payment Details
+            </h3>
+
+            <?php if ($order['payment_status'] === 'pending'): ?>
+              <?php
+              $amount = (float) $order['price'] * (int) $order['quantity'];
+              $orderCode = order_code((int) $order['id']);
+              $upiUrl = "upi://pay?pa=" . urlencode(UPI_ID) . "&pn=" . urlencode(UPI_NAME) . "&am=" . $amount . "&cu=INR&tn=" . urlencode($orderCode);
+              $qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=" . urlencode($upiUrl);
+              ?>
+              <div style="display: flex; flex-direction: column; align-items: center; text-align: center; gap: 16px; background: #fff; border: 1px solid rgba(0,0,0,0.06); padding: 20px; border-radius: 16px;">
+                <p style="font-size: 0.95rem; font-weight: 600; color: var(--text-soft); margin: 0; line-height: 1.4;">
+                  Scan QR with GPay, PhonePe, Paytm, or any UPI app to pay <strong style="color: var(--text); font-size:1.1rem; display:block; margin-top:4px;"><?= e(money_inr($amount)) ?></strong>
+                </p>
+                
+                <img src="<?= e($qrUrl) ?>" alt="UPI QR Code" style="width: 200px; height: 200px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.05); box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+                
+                <div style="font-size: 0.85rem; color: var(--text-soft); line-height:1.4;">
+                  UPI ID: <strong style="color:var(--text);"><?= e(UPI_ID) ?></strong><br>
+                  Payee: <strong style="color:var(--text);"><?= e(UPI_NAME) ?></strong>
+                </div>
+              </div>
+
+              <form method="post" style="margin-top: 20px;">
+                <?= csrf_field() ?>
+                <input type="hidden" name="action" value="submit_payment">
+                <div class="form-group" style="margin-bottom: 12px;">
+                  <label for="utr" style="font-weight: 700; font-size: 0.9rem; margin-bottom: 6px; display: block; color: var(--text);">Enter 12-Digit UPI Ref No. (UTR) <em>*</em></label>
+                  <input type="text" id="utr" name="utr" required pattern="\d{12}" maxlength="12" inputmode="numeric" placeholder="e.g. 304561284759" style="width: 100%; padding: 12px; border: 1.5px solid rgba(0,0,0,0.1); border-radius: 10px; font-size: 1.1rem; font-family: inherit; font-weight: 700; text-align: center; letter-spacing: 2px; color: var(--text);">
+                </div>
+                <button type="submit" class="btn" style="width: 100%; background: #1a73e8; color: #fff; padding: 12px; border-radius: 10px; border: none; font-weight: 700; cursor: pointer; transition: background 0.2s;">
+                  Confirm Payment
+                </button>
+              </form>
+
+            <?php elseif ($order['payment_status'] === 'submitted'): ?>
+              <div style="background: #fff8e1; border: 1px solid #ffe082; padding: 16px; border-radius: 12px; display: flex; flex-direction: column; gap: 12px;">
+                <div>
+                  <strong style="color: #b78103; font-size: 0.95rem; display: block; margin-bottom: 4px;">Payment Submitted</strong>
+                  <span style="font-size: 0.88rem; color: #665;">UTR: <strong><?= e($order['transaction_id']) ?></strong></span>
+                </div>
+                <p style="font-size: 0.88rem; line-height: 1.4; color: #554; margin: 0;">
+                  We are verifying your transaction. You will be notified as soon as the admin confirms it.
+                </p>
+                
+                <?php
+                $amount = (float) $order['price'] * (int) $order['quantity'];
+                $orderCode = order_code((int) $order['id']);
+                $waMessage = "Hello Admin, I have submitted payment for Order " . $orderCode . ". Amount: " . money_inr($amount) . ". My transaction UTR is: " . $order['transaction_id'] . ". Please verify and confirm my order.";
+                $waUrl = "https://api.whatsapp.com/send?phone=" . WHATSAPP_NUMBER . "&text=" . urlencode($waMessage);
+                ?>
+                <a href="<?= e($waUrl) ?>" target="_blank" rel="noopener" style="display: flex; align-items: center; justify-content: center; gap: 8px; background: #25d366; color: #fff; padding: 12px; border-radius: 10px; font-weight: 700; text-decoration: none; font-size: 0.95rem; margin-top: 4px; text-align: center; box-shadow: 0 4px 12px rgba(37,211,102,0.2);">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                  Confirm on WhatsApp
+                </a>
+              </div>
+
+            <?php elseif ($order['payment_status'] === 'paid'): ?>
+              <div style="background: #e8f5e9; border: 1px solid #c8e6c9; padding: 16px; border-radius: 12px; color: #2e7d32; font-size: 0.9rem; line-height: 1.4;">
+                <strong style="font-size: 0.95rem; display: block; margin-bottom: 4px; color: #1b5e20;">Payment Verified</strong>
+                Your payment of <strong><?= e(money_inr((float) $order['price'] * (int) $order['quantity'])) ?></strong> has been verified. Transaction UTR: <strong><?= e($order['transaction_id']) ?></strong>.
+              </div>
+
+            <?php elseif ($order['payment_status'] === 'failed'): ?>
+              <div style="background: #ffebee; border: 1px solid #ffcdd2; padding: 16px; border-radius: 12px; color: #c62828; font-size: 0.9rem; line-height: 1.4; display: flex; flex-direction: column; gap: 12px;">
+                <div>
+                  <strong style="font-size: 0.95rem; display: block; margin-bottom: 4px; color: #b71c1c;">Payment Rejected</strong>
+                  The submitted transaction UTR <strong><?= e($order['transaction_id']) ?></strong> was rejected by the admin.
+                </div>
+                
+                <?php
+                $amount = (float) $order['price'] * (int) $order['quantity'];
+                $orderCode = order_code((int) $order['id']);
+                $upiUrl = "upi://pay?pa=" . urlencode(UPI_ID) . "&pn=" . urlencode(UPI_NAME) . "&am=" . $amount . "&cu=INR&tn=" . urlencode($orderCode);
+                $qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=" . urlencode($upiUrl);
+                ?>
+                <hr style="border: 0; border-top: 1px solid rgba(198,40,40,0.12); margin: 4px 0;">
+                <p style="font-size: 0.85rem; color: #555; margin: 0; text-align: center;">Please scan the code below to pay again and enter the correct UTR details:</p>
+                
+                <div style="display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; background: #fff; padding: 12px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.05);">
+                  <img src="<?= e($qrUrl) ?>" alt="UPI QR Code" style="width: 150px; height: 150px;">
+                </div>
+
+                <form method="post" style="margin-top: 8px;">
+                  <?= csrf_field() ?>
+                  <input type="hidden" name="action" value="submit_payment">
+                  <div class="form-group" style="margin-bottom: 10px;">
+                    <label for="utr_retry" style="font-weight: 700; font-size: 0.85rem; margin-bottom: 4px; display: block; color: #333;">Re-enter 12-Digit Correct UTR</label>
+                    <input type="text" id="utr_retry" name="utr" required pattern="\d{12}" maxlength="12" inputmode="numeric" placeholder="Correct 12-Digit Ref No." style="width: 100%; padding: 10px; border: 1.5px solid rgba(0,0,0,0.1); border-radius: 8px; font-size: 0.95rem; font-family: inherit; font-weight: 600; text-align: center;">
+                  </div>
+                  <button type="submit" class="btn" style="width: 100%; background: #c62828; color: #fff; padding: 10px; border-radius: 8px; border: none; font-weight: 700; cursor: pointer;">
+                    Resubmit Payment
+                  </button>
+                </form>
+              </div>
+            <?php endif; ?>
+          </div>
+        <?php endif; ?>
+        
+        <?php if ($order['notes']): ?>
+          <div class="detail-row"><span>Your note</span><strong style="text-align:right;max-width:65%;"><?= e($order['notes']) ?></strong></div>
+        <?php endif; ?>
+      </div>
 
         <?php
         $tracking = get_order_tracking((int) $order['id']);
