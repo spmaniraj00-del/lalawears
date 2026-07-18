@@ -74,62 +74,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash('success', 'Tracking updated. Customer notified.');
             redirect('admin/order_view.php?id=' . $id);
         }
-    } elseif ($action === 'check_payment_status') {
-        if (!empty($order['transaction_id'])) {
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, TERMINALX_STATUS_URL);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
-                'user_token' => TERMINALX_TOKEN,
-                'order_id' => $order['transaction_id']
-            ]));
-            
-            $response = curl_exec($ch);
-            curl_close($ch);
-            
-            if ($response) {
-                $result = json_decode($response, true);
-                if (($result['status'] ?? '') === 'COMPLETED' || ($result['result']['txnStatus'] ?? '') === 'COMPLETED') {
-                    $pdo->prepare(
-                        "UPDATE orders SET
-                            payment_status = 'paid',
-                            status = 'confirmed',
-                            updated_at = datetime('now','localtime')
-                         WHERE id = ?"
-                    )->execute([$id]);
-
-                    add_order_tracking($id, 'confirmed', 'Payment verified automatically via gateway (UTR: ' . ($result['result']['utr'] ?? 'N/A') . ') · Order Confirmed', '', (int) $admin['id']);
-
-                    notify_user(
-                        (int) $order['user_id'],
-                        'Order #' . $id . ' payment verified',
-                        'Your payment was verified automatically. Order is now Confirmed.',
-                        'account/order_view.php?id=' . $id
-                    );
-
-                    flash('success', 'Payment verified automatically. Order confirmed.');
-                } elseif (($result['status'] ?? '') === 'FAILED' || ($result['result']['txnStatus'] ?? '') === 'FAILED') {
-                    $pdo->prepare(
-                        "UPDATE orders SET
-                            payment_status = 'failed',
-                            updated_at = datetime('now','localtime')
-                         WHERE id = ?"
-                    )->execute([$id]);
-                    
-                    add_order_tracking($id, $order['status'], 'Payment transaction failed/expired.', '', (int) $admin['id']);
-                    flash('error', 'Payment status is: FAILED.');
-                } else {
-                    flash('info', 'Payment status is still: ' . ($result['status'] ?? ($result['result']['txnStatus'] ?? 'PENDING')));
-                }
-            } else {
-                flash('error', 'Unable to reach payment gateway.');
-            }
-        } else {
-            flash('error', 'No transaction reference found for this order.');
-        }
-        redirect('admin/order_view.php?id=' . $id);
-
     } elseif ($action === 'approve_payment') {
         $pdo->prepare(
             "UPDATE orders SET
@@ -278,38 +222,32 @@ require __DIR__ . '/../includes/admin_header.php';
         <?php if (($order['payment_method'] ?? 'cod') === 'upi'): ?>
           <div style="background: #e3f2fd; border: 1.5px solid #90caf9; padding: 20px; border-radius: 16px; margin-bottom: 28px;">
             <h3 style="margin-top:0; font-size:1.2rem; font-weight:800; color:#0d47a1; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-              UPI Gateway Payment Sync
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="8"></line></svg>
+              UPI Payment Verification
             </h3>
             <p style="font-size: 0.9rem; color: #333; margin: 0 0 16px; line-height: 1.4;">
-              Gateway Transaction ID: <strong style="font-size: 1.05rem; background:#fff; padding:2px 6px; border-radius:4px; border:1px solid rgba(0,0,0,0.1); letter-spacing:0.5px;"><?= e($order['transaction_id'] ?: 'None') ?></strong><br>
+              Submitted UTR / Ref: <strong style="font-size: 1.05rem; background:#fff; padding:2px 6px; border-radius:4px; border:1px solid rgba(0,0,0,0.1); letter-spacing:0.5px;"><?= e($order['transaction_id'] ?: 'None') ?></strong><br>
               Payment Status: <strong style="text-transform:uppercase; color:#0d47a1;"><?= e($order['payment_status']) ?></strong>
             </p>
-            <div style="display:flex; gap:10px; flex-wrap:wrap;">
-              <?php if ($order['transaction_id']): ?>
-                <form method="post" style="flex:1; min-width:140px;">
-                  <?= csrf_field() ?>
-                  <input type="hidden" name="action" value="check_payment_status">
-                  <button type="submit" class="btn-admin-primary" style="width:100%; justify-content:center; background:#1a73e8; border:none; color:#fff; padding:10px; border-radius:8px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-                    Sync Status
-                  </button>
-                </form>
-              <?php endif; ?>
-              
-              <?php if ($order['payment_status'] !== 'paid'): ?>
+            
+            <?php if ($order['payment_status'] !== 'paid'): ?>
+              <div style="display:flex; gap:10px; flex-wrap:wrap;">
                 <form method="post" style="flex:1; min-width:140px;">
                   <?= csrf_field() ?>
                   <input type="hidden" name="action" value="approve_payment">
-                  <button type="submit" class="btn-admin-primary" style="width:100%; justify-content:center; background:#2e7d32; border:none; color:#fff; padding:10px; border-radius:8px; font-weight:700; cursor:pointer;">Manual Approve</button>
+                  <button type="submit" class="btn-admin-primary" style="width:100%; justify-content:center; background:#2e7d32; border:none; color:#fff; padding:10px; border-radius:8px; font-weight:700; cursor:pointer;">Approve & Confirm</button>
                 </form>
                 <form method="post" style="flex:1; min-width:140px;">
                   <?= csrf_field() ?>
                   <input type="hidden" name="action" value="reject_payment">
-                  <button type="submit" class="btn-admin-outline" style="width:100%; justify-content:center; border:1px solid #c62828; color:#c62828; background:none; padding:10px; border-radius:8px; font-weight:700; cursor:pointer;">Manual Reject</button>
+                  <button type="submit" class="btn-admin-outline" style="width:100%; justify-content:center; border:1px solid #c62828; color:#c62828; background:none; padding:10px; border-radius:8px; font-weight:700; cursor:pointer;">Reject</button>
                 </form>
-              <?php endif; ?>
-            </div>
+              </div>
+            <?php else: ?>
+              <div style="color: #2e7d32; font-weight:700; font-size:0.95rem;">
+                ✓ Payment verified and confirmed.
+              </div>
+            <?php endif; ?>
           </div>
         <?php endif; ?>
 

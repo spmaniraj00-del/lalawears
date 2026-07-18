@@ -14,7 +14,7 @@ define('UPLOAD_DIR', APP_ROOT . '/assets/uploads');
 define('WHATSAPP_NUMBER', '916205484119');
 define('WHATSAPP_URL', 'https://api.whatsapp.com/send?phone=' . WHATSAPP_NUMBER . '&text=Hello%2C%20I%20want%20to%20know%20about%20apparel.%20Could%20you%20please%20send%20the%20full%20details%3F');
 define('UPI_ID', '6205484119@ybl');
-define('UPI_NAME', 'LALA WEARS');
+define('UPI_NAME', 'PRITAM 999 OFFICIAL');
 define('TERMINALX_TOKEN', 'f7b1048ae987b0ef20f724ddb20e7316a191b0e2f1f67596b7f10c64498e7ed7');
 define('TERMINALX_CREATE_URL', 'https://terminalx999.space/api/create-order');
 define('TERMINALX_STATUS_URL', 'https://terminalx999.space/api/check-order-status');

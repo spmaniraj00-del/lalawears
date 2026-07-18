@@ -25,152 +25,12 @@ if ($user['role'] !== 'admin' && (int) $order['user_id'] !== (int) $user['id']) 
     redirect('account/index.php');
 }
 
-// Auto status check for pending UPI orders that have a gateway transaction ID
-if (($order['payment_method'] ?? '') === 'upi' && ($order['payment_status'] ?? '') === 'pending' && !empty($order['transaction_id'])) {
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, TERMINALX_STATUS_URL);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
-        'user_token' => TERMINALX_TOKEN,
-        'order_id' => $order['transaction_id']
-    ]));
-    
-    $response = curl_exec($ch);
-    curl_close($ch);
-    
-    if ($response) {
-        $result = json_decode($response, true);
-        if (($result['status'] ?? '') === 'COMPLETED' || ($result['result']['txnStatus'] ?? '') === 'COMPLETED') {
-            $pdo = db();
-            $pdo->prepare(
-                "UPDATE orders SET
-                    payment_status = 'paid',
-                    status = 'confirmed',
-                    updated_at = datetime('now','localtime')
-                 WHERE id = ?"
-            )->execute([$id]);
-
-            add_order_tracking(
-                $id,
-                'confirmed',
-                'Payment verified automatically via gateway (UTR: ' . ($result['result']['utr'] ?? 'N/A') . ') · Order Confirmed',
-                (string) ($order['city'] ?? '')
-            );
-
-            notify_user(
-                (int) $order['user_id'],
-                'Order #' . $id . ' payment verified',
-                'Your payment was verified automatically. Order is now Confirmed.',
-                'account/order_view.php?id=' . $id
-            );
-
-            notify_admins(
-                'Payment verified automatically for Order #' . $id,
-                'Order #' . $id . ' total ' . money_inr((float) $order['price'] * (int) $order['quantity']) . ' verified via gateway.',
-                'admin/order_view.php?id=' . $id
-            );
-
-            // Refresh order data
-            $stmt->execute([$id]);
-            $order = $stmt->fetch();
-        } elseif (($result['status'] ?? '') === 'FAILED' || ($result['result']['txnStatus'] ?? '') === 'FAILED') {
-            $pdo = db();
-            $pdo->prepare(
-                "UPDATE orders SET
-                    payment_status = 'failed',
-                    updated_at = datetime('now','localtime')
-                 WHERE id = ?"
-            )->execute([$id]);
-            
-            // Refresh order data
-            $stmt->execute([$id]);
-            $order = $stmt->fetch();
-        }
-    }
-}
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_post_csrf();
     $action = $_POST['action'] ?? '';
 
     if ($action === 'pay') {
-        $amount = (float) $order['price'] * (int) $order['quantity'];
-        // Generate unique payment order ID to avoid ORDER_ID_ALREADY_EXISTS on retry
-        $txnId = order_code((int) $order['id']) . 'T' . time();
-        $redirectUrl = app_absolute_url('account/order_view.php?id=' . $id);
-
-        $postData = [
-            'customer_mobile' => normalize_phone($order['customer_phone'] ?: $user['phone'] ?: '9999999999'),
-            'user_token' => TERMINALX_TOKEN,
-            'amount' => (string) $amount,
-            'order_id' => $txnId,
-            'redirect_url' => $redirectUrl,
-            'remark1' => $order['product_name'],
-            'remark2' => 'Order #' . $id,
-        ];
-
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, TERMINALX_CREATE_URL);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
-
-        $response = curl_exec($ch);
-        $err = curl_error($ch);
-        curl_close($ch);
-
-        if ($response) {
-            $result = json_decode($response, true);
-            if (($result['status'] ?? '') === 'SUCCESS' && !empty($result['result']['payment_url'])) {
-                $pdo = db();
-                $pdo->prepare(
-                    "UPDATE orders SET
-                        payment_status = 'submitted',
-                        transaction_id = ?,
-                        updated_at = datetime('now','localtime')
-                     WHERE id = ?"
-                )->execute([$txnId, $id]);
-
-                header('Location: ' . $result['result']['payment_url']);
-                exit;
-            } else {
-                flash('error', 'Payment gateway error: ' . ($result['message'] ?? 'Could not create transaction.'));
-            }
-        } else {
-            flash('error', 'Unable to reach payment gateway: ' . $err);
-        }
-        redirect('account/order_view.php?id=' . $id);
-    } elseif ($action === 'submit_payment') {
-        $utr = trim($_POST['utr'] ?? '');
-        if (!preg_match('/^\d{12}$/', $utr)) {
-            flash('error', 'Please enter a valid 12-digit UPI UTR/Transaction Reference Number.');
-        } else {
-            $pdo = db();
-            $pdo->prepare(
-                "UPDATE orders SET
-                    payment_status = 'submitted',
-                    transaction_id = ?,
-                    updated_at = datetime('now','localtime')
-                 WHERE id = ?"
-            )->execute([$utr, $id]);
-
-            add_order_tracking(
-                $id,
-                'pending',
-                'Payment details submitted: UTR ' . $utr . ' · Awaiting admin verification',
-                (string) ($order['city'] ?? '')
-            );
-
-            notify_admins(
-                'Payment submitted for Order #' . $id,
-                'Customer ' . ($order['customer_name'] ?: $user['name']) . ' submitted UTR ' . $utr . ' for ' . money_inr((float) $order['price'] * (int) $order['quantity']),
-                'admin/order_view.php?id=' . $id
-            );
-
-            flash('success', 'Payment details submitted successfully! Awaiting verification.');
-            redirect('account/order_view.php?id=' . $id);
-        }
+        redirect('account/payment.php?id=' . $id);
     }
 }
 
@@ -259,7 +119,7 @@ require __DIR__ . '/../includes/header.php';
               <?php $amount = (float) $order['price'] * (int) $order['quantity']; ?>
               <div style="text-align: center; background: #fff; border: 1px solid rgba(0,0,0,0.06); padding: 24px; border-radius: 16px; display:flex; flex-direction:column; gap:16px;">
                 <p style="font-size: 1.05rem; font-weight: 600; color: var(--text-soft); margin: 0;">
-                  Click below to pay securely via UPI apps or Card
+                  Please complete the payment of
                   <strong style="color: #1a73e8; font-size: 1.3rem; display: block; margin-top: 6px;"><?= e(money_inr($amount)) ?></strong>
                 </p>
                 
@@ -276,41 +136,36 @@ require __DIR__ . '/../includes/header.php';
             <?php elseif ($order['payment_status'] === 'submitted'): ?>
               <div style="background: #fff8e1; border: 1px solid #ffe082; padding: 16px; border-radius: 12px; display: flex; flex-direction: column; gap: 12px;">
                 <div>
-                  <strong style="color: #b78103; font-size: 0.95rem; display: block; margin-bottom: 4px;">Payment Initiated</strong>
-                  <span style="font-size: 0.88rem; color: #665;">Ref: <strong><?= e($order['transaction_id']) ?></strong></span>
+                  <strong style="color: #b78103; font-size: 0.95rem; display: block; margin-bottom: 4px;">Payment Reference Submitted</strong>
+                  <span style="font-size: 0.88rem; color: #665;">UTR / Ref: <strong><?= e($order['transaction_id']) ?></strong></span>
                 </div>
                 <p style="font-size: 0.88rem; line-height: 1.4; color: #554; margin: 0;">
-                  The payment transaction was initiated. If you completed the payment, refresh this page or click below to check status.
+                  We are verifying your transaction. You will be notified as soon as the admin confirms it.
                 </p>
                 
-                <div style="display:flex; gap:10px;">
-                  <a href="<?= e(url('account/order_view.php?id=' . $order['id'])) ?>" class="btn" style="flex:1; background: #e65100; color: #fff; padding: 10px; border-radius: 8px; font-weight: 700; text-decoration: none; font-size: 0.9rem; text-align: center;">
-                    Check Payment Status
-                  </a>
-                  
-                  <?php
-                  $amount = (float) $order['price'] * (int) $order['quantity'];
-                  $orderCode = order_code((int) $order['id']);
-                  $waMessage = "Hello Admin, I have initiated payment for Order " . $orderCode . ". Amount: " . money_inr($amount) . ". My transaction Ref is: " . $order['transaction_id'] . ". Please verify my order.";
-                  $waUrl = "https://api.whatsapp.com/send?phone=" . WHATSAPP_NUMBER . "&text=" . urlencode($waMessage);
-                  ?>
-                  <a href="<?= e($waUrl) ?>" target="_blank" rel="noopener" style="display: flex; align-items: center; justify-content: center; gap: 6px; background: #25d366; color: #fff; padding: 10px; border-radius: 8px; font-weight: 700; text-decoration: none; font-size: 0.9rem; text-align: center;">
-                    WhatsApp Support
-                  </a>
-                </div>
+                <?php
+                $amount = (float) $order['price'] * (int) $order['quantity'];
+                $orderCode = order_code((int) $order['id']);
+                $waMessage = "Hello Admin, I have submitted payment for Order " . $orderCode . ". Amount: " . money_inr($amount) . ". My transaction UTR is: " . $order['transaction_id'] . ". Please verify and confirm my order.";
+                $waUrl = "https://api.whatsapp.com/send?phone=" . WHATSAPP_NUMBER . "&text=" . urlencode($waMessage);
+                ?>
+                <a href="<?= e($waUrl) ?>" target="_blank" rel="noopener" style="display: flex; align-items: center; justify-content: center; gap: 8px; background: #25d366; color: #fff; padding: 12px; border-radius: 10px; font-weight: 700; text-decoration: none; font-size: 0.95rem; margin-top: 4px; text-align: center; box-shadow: 0 4px 12px rgba(37,211,102,0.2);">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                  Confirm on WhatsApp
+                </a>
               </div>
 
             <?php elseif ($order['payment_status'] === 'paid'): ?>
               <div style="background: #e8f5e9; border: 1px solid #c8e6c9; padding: 16px; border-radius: 12px; color: #2e7d32; font-size: 0.9rem; line-height: 1.4;">
                 <strong style="font-size: 0.95rem; display: block; margin-bottom: 4px; color: #1b5e20;">Payment Verified</strong>
-                Your payment of <strong><?= e(money_inr((float) $order['price'] * (int) $order['quantity'])) ?></strong> has been verified automatically. Transaction Ref: <strong><?= e($order['transaction_id']) ?></strong>.
+                Your payment of <strong><?= e(money_inr((float) $order['price'] * (int) $order['quantity'])) ?></strong> has been verified. Transaction UTR: <strong><?= e($order['transaction_id']) ?></strong>.
               </div>
 
             <?php elseif ($order['payment_status'] === 'failed'): ?>
               <div style="background: #ffebee; border: 1px solid #ffcdd2; padding: 16px; border-radius: 12px; color: #c62828; font-size: 0.9rem; line-height: 1.4; display: flex; flex-direction: column; gap: 12px;">
                 <div>
-                  <strong style="font-size: 0.95rem; display: block; margin-bottom: 4px; color: #b71c1c;">Payment Failed / Expired</strong>
-                  The transaction <strong><?= e($order['transaction_id']) ?></strong> failed or expired. Please click below to try paying again.
+                  <strong style="font-size: 0.95rem; display: block; margin-bottom: 4px; color: #b71c1c;">Payment Rejected</strong>
+                  The submitted transaction reference <strong><?= e($order['transaction_id']) ?></strong> was rejected by the admin. Please try paying again.
                 </div>
                 
                 <form method="post">
