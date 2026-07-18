@@ -516,12 +516,18 @@ function product_sold_count(int $productId): int
 function product_reviews(int $productId, int $limit = 30): array
 {
     $stmt = db()->prepare(
-        'SELECT r.*, u.name AS user_name, u.avatar AS user_avatar
+        "SELECT r.*, u.name AS user_name, u.avatar AS user_avatar,
+                EXISTS(
+                    SELECT 1 FROM orders o
+                    WHERE o.user_id=r.user_id
+                      AND o.product_id=r.product_id
+                      AND o.status!='cancelled'
+                ) AS verified_purchase
          FROM reviews r
          JOIN users u ON u.id = r.user_id
          WHERE r.product_id = ?
          ORDER BY r.id DESC
-         LIMIT ?'
+         LIMIT ?"
     );
     $stmt->bindValue(1, $productId, PDO::PARAM_INT);
     $stmt->bindValue(2, $limit, PDO::PARAM_INT);

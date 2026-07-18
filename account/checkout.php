@@ -180,6 +180,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (count($orderIds) === 1) {
             flash('success', 'Order placed! Your Tracking ID is ' . order_code($orderIds[0]) . '.');
+            if ($payMethod === 'upi') {
+                redirect('account/payment.php?id=' . $orderIds[0]);
+            }
             redirect('account/order_view.php?id=' . $orderIds[0]);
         }
         $codes = implode(', ', array_map('order_code', $orderIds));

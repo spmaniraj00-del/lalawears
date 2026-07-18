@@ -55,9 +55,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        db()->prepare('DELETE FROM reviews WHERE product_id = ? AND user_id = ?')
-            ->execute([(int) $product['id'], (int) $user['id']]);
-        db()->prepare('INSERT INTO reviews (product_id, user_id, rating, comment, images) VALUES (?, ?, ?, ?, ?)')
+        db()->prepare(
+            "INSERT INTO reviews (product_id, user_id, rating, comment, images)
+             VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(product_id, user_id) DO UPDATE SET
+               rating=excluded.rating,
+               comment=excluded.comment,
+               images=excluded.images,
+               created_at=datetime('now','localtime')"
+        )
             ->execute([
                 (int) $product['id'],
                 (int) $user['id'],
@@ -253,6 +259,9 @@ function star_row(float $avg): string
             <div class="review-body">
               <div class="review-top">
                 <strong><?= e($rev['user_name']) ?></strong>
+                <?php if (!empty($rev['verified_purchase'])): ?>
+                  <span class="verified-purchase">Verified purchase</span>
+                <?php endif; ?>
                 <?= star_row((float) $rev['rating']) ?>
                 <time><?= e(date('d M Y', strtotime($rev['created_at']))) ?></time>
               </div>

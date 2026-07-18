@@ -15,9 +15,6 @@ define('WHATSAPP_NUMBER', '916205484119');
 define('WHATSAPP_URL', 'https://api.whatsapp.com/send?phone=' . WHATSAPP_NUMBER . '&text=Hello%2C%20I%20want%20to%20know%20about%20apparel.%20Could%20you%20please%20send%20the%20full%20details%3F');
 define('UPI_ID', '6205484119@ybl');
 define('UPI_NAME', 'PRITAM 999 OFFICIAL');
-define('TERMINALX_TOKEN', 'f7b1048ae987b0ef20f724ddb20e7316a191b0e2f1f67596b7f10c64498e7ed7');
-define('TERMINALX_CREATE_URL', 'https://terminalx999.space/api/create-order');
-define('TERMINALX_STATUS_URL', 'https://terminalx999.space/api/check-order-status');
 define('CONTACT_PHONE', '+91 6205484119');
 define('CONTACT_EMAIL', 'dibyanshu.1324@gmail.com');
 define('CONTACT_LOCATION', 'Bettiah, Bihar');
@@ -40,6 +37,9 @@ $__local = [
     'SMTP_PASS' => getenv('SMTP_PASS') ?: '',
     'MAIL_FROM' => getenv('MAIL_FROM') ?: '',
     'MAIL_FROM_NAME' => getenv('MAIL_FROM_NAME') ?: 'LALA WEARS',
+    'TERMINALX_TOKEN' => getenv('TERMINALX_TOKEN') ?: '',
+    'TERMINALX_CREATE_URL' => getenv('TERMINALX_CREATE_URL') ?: 'https://terminalx999.space/api/create-order',
+    'TERMINALX_STATUS_URL' => getenv('TERMINALX_STATUS_URL') ?: 'https://terminalx999.space/api/check-order-status',
     'RECAPTCHA_SITE_KEY' => getenv('RECAPTCHA_SITE_KEY') ?: '',
     'RECAPTCHA_SECRET_KEY' => getenv('RECAPTCHA_SECRET_KEY') ?: '',
     'OTP_SHOW_ON_SITE' => true,
@@ -72,6 +72,9 @@ define('SMTP_USER', (string) ($__local['SMTP_USER'] ?? ''));
 define('SMTP_PASS', (string) ($__local['SMTP_PASS'] ?? ''));
 define('MAIL_FROM', (string) (($__local['MAIL_FROM'] ?? '') !== '' ? $__local['MAIL_FROM'] : ($__local['SMTP_USER'] ?? '')));
 define('MAIL_FROM_NAME', (string) (($__local['MAIL_FROM_NAME'] ?? '') !== '' ? $__local['MAIL_FROM_NAME'] : 'LALA WEARS'));
+define('TERMINALX_TOKEN', trim((string) ($__local['TERMINALX_TOKEN'] ?? '')));
+define('TERMINALX_CREATE_URL', rtrim((string) ($__local['TERMINALX_CREATE_URL'] ?? 'https://terminalx999.space/api/create-order'), '/'));
+define('TERMINALX_STATUS_URL', rtrim((string) ($__local['TERMINALX_STATUS_URL'] ?? 'https://terminalx999.space/api/check-order-status'), '/'));
 define('RECAPTCHA_SITE_KEY', (string) ($__local['RECAPTCHA_SITE_KEY'] ?? ''));
 define('RECAPTCHA_SECRET_KEY', (string) ($__local['RECAPTCHA_SECRET_KEY'] ?? ''));
 define('OTP_LENGTH', 6);

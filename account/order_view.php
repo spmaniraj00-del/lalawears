@@ -27,69 +27,10 @@ if ($user['role'] !== 'admin' && (int) $order['user_id'] !== (int) $user['id']) 
 
 // Auto status check for submitted UPI orders that have a gateway transaction ID
 if (($order['payment_method'] ?? '') === 'upi' && ($order['payment_status'] ?? '') === 'submitted' && !empty($order['transaction_id'])) {
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, TERMINALX_STATUS_URL);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
-        'user_token' => TERMINALX_TOKEN,
-        'order_id' => $order['transaction_id']
-    ]));
-    
-    $response = curl_exec($ch);
-    curl_close($ch);
-    
-    if ($response) {
-        $result = json_decode($response, true);
-        if (($result['status'] ?? '') === 'COMPLETED' || ($result['result']['txnStatus'] ?? '') === 'COMPLETED') {
-            $pdo = db();
-            $pdo->prepare(
-                "UPDATE orders SET
-                    payment_status = 'paid',
-                    status = 'confirmed',
-                    updated_at = datetime('now','localtime')
-                 WHERE id = ?"
-            )->execute([$id]);
-
-            add_order_tracking(
-                $id,
-                'confirmed',
-                'Payment verified automatically via gateway (UTR: ' . ($result['result']['utr'] ?? 'N/A') . ') · Order Confirmed',
-                (string) ($order['city'] ?? '')
-            );
-
-            notify_user(
-                (int) $order['user_id'],
-                'Order #' . $id . ' payment verified',
-                'Your payment was verified automatically. Order is now Confirmed.',
-                'account/order_view.php?id=' . $id
-            );
-
-            notify_admins(
-                'Payment verified automatically for Order #' . $id,
-                'Order #' . $id . ' total ' . money_inr((float) $order['price'] * (int) $order['quantity']) . ' verified via gateway.',
-                'admin/order_view.php?id=' . $id
-            );
-
-            // Refresh order data
-            $stmt->execute([$id]);
-            $order = $stmt->fetch();
-        } elseif (($result['status'] ?? '') === 'FAILED' || ($result['result']['txnStatus'] ?? '') === 'FAILED') {
-            $pdo = db();
-            $pdo->prepare(
-                "UPDATE orders SET
-                    payment_status = 'failed',
-                    updated_at = datetime('now','localtime')
-                 WHERE id = ?"
-            )->execute([$id]);
-            
-            // Refresh order data
-            $stmt->execute([$id]);
-            $order = $stmt->fetch();
-        }
-    }
+    $paymentCheck = terminalx_check_payment((string) $order['transaction_id']);
+    terminalx_apply_status($order, $paymentCheck);
+    $stmt->execute([$id]);
+    $order = $stmt->fetch();
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -97,54 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
     if ($action === 'pay') {
-        $amount = (float) $order['price'] * (int) $order['quantity'];
-        // Generate unique payment order ID to avoid ORDER_ID_ALREADY_EXISTS on retry
-        $txnId = 'TXN' . str_pad((string)$order['id'], 5, '0', STR_PAD_LEFT) . 'T' . time();
-        $redirectUrl = app_absolute_url('account/order_view.php?id=' . $id);
-
-        $postData = [
-            'customer_mobile' => normalize_phone($order['customer_phone'] ?: $user['phone'] ?: '9999999999'),
-            'user_token' => TERMINALX_TOKEN,
-            'amount' => (string) $amount,
-            'order_id' => $txnId,
-            'redirect_url' => $redirectUrl,
-            'remark1' => $order['product_name'],
-            'remark2' => 'Order #' . $id,
-        ];
-
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, TERMINALX_CREATE_URL);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
-
-        $response = curl_exec($ch);
-        $err = curl_error($ch);
-        curl_close($ch);
-
-        if ($response) {
-            $result = json_decode($response, true);
-            if (($result['status'] ?? '') === 'SUCCESS' && !empty($result['result']['payment_url'])) {
-                $pdo = db();
-                $pdo->prepare(
-                    "UPDATE orders SET
-                        payment_status = 'submitted',
-                        transaction_id = ?,
-                        updated_at = datetime('now','localtime')
-                     WHERE id = ?"
-                )->execute([$txnId, $id]);
-
-                header('Location: ' . $result['result']['payment_url']);
-                exit;
-            } else {
-                flash('error', 'Payment gateway error: ' . ($result['message'] ?? json_encode($result) ?? 'Could not create transaction.'));
-            }
-        } else {
-            flash('error', 'Unable to reach payment gateway: ' . $err);
-        }
-        redirect('account/order_view.php?id=' . $id);
+        redirect('account/payment.php?id=' . $id);
     } elseif ($action === 'cancel_order') {
         $reason = trim($_POST['reason'] ?? '');
         if ($reason === '') {
@@ -225,7 +119,10 @@ require __DIR__ . '/../includes/header.php';
           <div class="detail-row"><span>Total</span><strong><?= e(money_inr((float) $order['price'] * (int) $order['quantity'])) ?></strong></div>
           <div class="detail-row"><span>Payment Method</span><strong><?= ($order['payment_method'] ?? 'cod') === 'upi' ? 'UPI / QR Code' : 'Cash on Delivery' ?></strong></div>
           <?php if (($order['payment_method'] ?? 'cod') === 'upi' && $order['transaction_id']): ?>
-            <div class="detail-row"><span>UPI UTR / Ref</span><strong><?= e($order['transaction_id']) ?></strong></div>
+            <div class="detail-row"><span>Gateway Ref</span><strong><?= e($order['transaction_id']) ?></strong></div>
+          <?php endif; ?>
+          <?php if (!empty($order['payment_utr'])): ?>
+            <div class="detail-row"><span>UPI UTR</span><strong><?= e($order['payment_utr']) ?></strong></div>
           <?php endif; ?>
           <?php if (!empty($order['customer_name'])): ?>
             <div class="detail-row"><span>Name</span><strong><?= e($order['customer_name']) ?></strong></div>

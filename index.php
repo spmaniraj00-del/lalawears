@@ -5,16 +5,29 @@ require_once __DIR__ . '/includes/bootstrap.php';
 $searchQuery = trim((string) ($_GET['q'] ?? ''));
 if ($searchQuery !== '') {
     $stmt = db()->prepare(
-        'SELECT * FROM products WHERE is_active = 1 AND (name LIKE :q OR description LIKE :q)
-         ORDER BY sort_order ASC, id ASC'
+        'SELECT p.*,
+                COALESCE((SELECT AVG(r.rating) FROM reviews r WHERE r.product_id=p.id), 0) AS avg_rating,
+                (SELECT COUNT(*) FROM reviews r WHERE r.product_id=p.id) AS review_count
+         FROM products p
+         WHERE p.is_active = 1
+           AND (p.name LIKE :q OR p.description LIKE :q OR p.keywords LIKE :q OR p.category LIKE :q)
+         ORDER BY p.sort_order ASC, p.id ASC'
     );
     $stmt->execute([':q' => '%' . $searchQuery . '%']);
     $products = $stmt->fetchAll();
 } else {
     $products = db()->query(
-        'SELECT * FROM products WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
+        'SELECT p.*,
+                COALESCE((SELECT AVG(r.rating) FROM reviews r WHERE r.product_id=p.id), 0) AS avg_rating,
+                (SELECT COUNT(*) FROM reviews r WHERE r.product_id=p.id) AS review_count
+         FROM products p WHERE p.is_active = 1 ORDER BY p.sort_order ASC, p.id ASC'
     )->fetchAll();
 }
+$categories = db()->query(
+    "SELECT DISTINCT category FROM products
+     WHERE is_active=1 AND trim(COALESCE(category,''))!=''
+     ORDER BY category"
+)->fetchAll(PDO::FETCH_COLUMN);
 $pageTitle = APP_NAME . ' | ' . APP_TAGLINE;
 require __DIR__ . '/includes/header.php';
 $user = current_user();
@@ -22,6 +35,10 @@ $user = current_user();
 // Simple category tag per product (used by the filter pills)
 function product_category(array $p): string
 {
+    $stored = slugify((string) ($p['category'] ?? ''));
+    if ($stored !== '') {
+        return $stored;
+    }
     $name = strtolower($p['name'] . ' ' . $p['description']);
     if (str_contains($name, 'embroider') || str_contains($name, 'heritage') || str_contains($name, 'bihar')) {
         return 'heritage';
@@ -130,9 +147,11 @@ function product_category(array $p): string
 
     <div class="deals-filters reveal-up" role="tablist" aria-label="Product categories">
       <button class="filter-pill is-active" data-filter="all">All</button>
-      <button class="filter-pill" data-filter="heritage">Heritage</button>
-      <button class="filter-pill" data-filter="cotton">Cotton</button>
-      <button class="filter-pill" data-filter="comfort">Comfort</button>
+      <?php foreach ($categories as $category): ?>
+        <button class="filter-pill" data-filter="<?= e(slugify((string) $category)) ?>">
+          <?= e(ucwords(str_replace('-', ' ', (string) $category))) ?>
+        </button>
+      <?php endforeach; ?>
     </div>
 
     <?php if (!$products): ?>
@@ -173,6 +192,11 @@ function product_category(array $p): string
           </div>
           <div class="deal-body">
             <h3 class="deal-name"><a href="<?= e($productUrl) ?>"><?= e($product['name']) ?></a></h3>
+            <div class="deal-rating" aria-label="<?= e(number_format((float) $product['avg_rating'], 1)) ?> out of 5 stars">
+              <span class="deal-rating-star">★</span>
+              <strong><?= e(number_format((float) $product['avg_rating'], 1)) ?></strong>
+              <span>(<?= (int) $product['review_count'] ?>)</span>
+            </div>
             <p class="deal-desc"><?= e($product['description']) ?></p>
             <div class="deal-meta">
               <span class="deal-price"><?= e(money_inr($product['price'])) ?></span>

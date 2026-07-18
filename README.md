@@ -62,6 +62,9 @@ Rules → Redirect Rules → create:
 - `APP_URL` = `https://www.lalawearscraftedforstyle.com`
 - `FORCE_HTTPS` = `1`
 - `FORCE_CANONICAL_HOST` = `1` (redirects bare domain → www)
+- `TERMINALX_TOKEN` = payment API token (keep secret; rotate if exposed)
+- `TERMINALX_CREATE_URL` = `https://terminalx999.space/api/create-order`
+- `TERMINALX_STATUS_URL` = `https://terminalx999.space/api/check-order-status`
 
 #### 4b) Forgot password / email (Resend) — same as before
 Railway → your service → **Variables** → add:

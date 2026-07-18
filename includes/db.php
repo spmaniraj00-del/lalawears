@@ -189,6 +189,9 @@ function migrate_schema(PDO $pdo): void
         'payment_method' => "ALTER TABLE orders ADD COLUMN payment_method TEXT DEFAULT 'cod'",
         'payment_status' => "ALTER TABLE orders ADD COLUMN payment_status TEXT DEFAULT 'pending'",
         'transaction_id' => "ALTER TABLE orders ADD COLUMN transaction_id TEXT DEFAULT ''",
+        'payment_url' => "ALTER TABLE orders ADD COLUMN payment_url TEXT DEFAULT ''",
+        'payment_utr' => "ALTER TABLE orders ADD COLUMN payment_utr TEXT DEFAULT ''",
+        'payment_checked_at' => "ALTER TABLE orders ADD COLUMN payment_checked_at TEXT DEFAULT ''",
         'cancel_reason' => "ALTER TABLE orders ADD COLUMN cancel_reason TEXT DEFAULT ''",
     ];
     foreach ($orderExtras as $col => $sql) {
@@ -274,6 +277,23 @@ function migrate_schema(PDO $pdo): void
     if (!isset($productCols['images'])) {
         $pdo->exec("ALTER TABLE products ADD COLUMN images TEXT DEFAULT ''");
     }
+    if (!isset($productCols['category'])) {
+        $pdo->exec("ALTER TABLE products ADD COLUMN category TEXT DEFAULT 'comfort'");
+        $pdo->exec("UPDATE products SET category='heritage' WHERE lower(name || ' ' || description) LIKE '%heritage%' OR lower(name || ' ' || description) LIKE '%bihar%' OR lower(name || ' ' || description) LIKE '%embroider%'");
+        $pdo->exec("UPDATE products SET category='cotton' WHERE lower(name || ' ' || description) LIKE '%cotton%' OR lower(name || ' ' || description) LIKE '%tee%'");
+    }
+    if (!isset($productCols['keywords'])) {
+        $pdo->exec("ALTER TABLE products ADD COLUMN keywords TEXT DEFAULT ''");
+    }
+
+    // One review per customer/product at database level.
+    $pdo->exec(
+        'DELETE FROM reviews
+         WHERE id NOT IN (
+             SELECT MAX(id) FROM reviews GROUP BY product_id, user_id
+         )'
+    );
+    $pdo->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_reviews_product_user ON reviews(product_id, user_id)');
 
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS wishlists (

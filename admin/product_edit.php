@@ -7,6 +7,9 @@ $pdo = db();
 $id = (int) ($_GET['id'] ?? 0);
 $product = null;
 $error = '';
+$existingCategories = $pdo->query(
+    "SELECT DISTINCT category FROM products WHERE trim(COALESCE(category,'')) != '' ORDER BY category"
+)->fetchAll(PDO::FETCH_COLUMN);
 
 if ($id > 0) {
     $stmt = $pdo->prepare('SELECT * FROM products WHERE id = ? LIMIT 1');
@@ -22,6 +25,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_post_csrf();
     $name = trim($_POST['name'] ?? '');
     $description = trim($_POST['description'] ?? '');
+    $category = slugify((string) ($_POST['category'] ?? 'comfort'));
+    $keywords = trim((string) ($_POST['keywords'] ?? ''));
     $price = (float) ($_POST['price'] ?? 0);
     $stock = (int) ($_POST['stock'] ?? 0);
     $sort = (int) ($_POST['sort_order'] ?? 0);
@@ -35,6 +40,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($price < 0) {
             throw new RuntimeException('Price cannot be negative.');
         }
+        if ($category === '') {
+            throw new RuntimeException('Product category is required.');
+        }
+        $category = mb_substr($category, 0, 50);
+        $keywords = mb_substr($keywords, 0, 500);
 
         $gallery = $product ? product_gallery_paths($product) : [];
         $slots = [
@@ -69,17 +79,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($id > 0) {
             $stmt = $pdo->prepare(
-                "UPDATE products SET name=?, slug=?, description=?, price=?, image=?, images=?, stock=?, is_active=?, sort_order=?, updated_at=datetime('now','localtime')
+                "UPDATE products SET name=?, slug=?, description=?, category=?, keywords=?, price=?, image=?, images=?, stock=?, is_active=?, sort_order=?, updated_at=datetime('now','localtime')
                  WHERE id=?"
             );
-            $stmt->execute([$name, $slug, $description, $price, $imagePath, $imagesJson, $stock, $isActive, $sort, $id]);
+            $stmt->execute([$name, $slug, $description, $category, $keywords, $price, $imagePath, $imagesJson, $stock, $isActive, $sort, $id]);
             flash('success', 'Product updated successfully.');
         } else {
             $stmt = $pdo->prepare(
-                'INSERT INTO products (name, slug, description, price, image, images, stock, is_active, sort_order)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                'INSERT INTO products (name, slug, description, category, keywords, price, image, images, stock, is_active, sort_order)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
-            $stmt->execute([$name, $slug, $description, $price, $imagePath, $imagesJson, $stock, $isActive, $sort]);
+            $stmt->execute([$name, $slug, $description, $category, $keywords, $price, $imagePath, $imagesJson, $stock, $isActive, $sort]);
             flash('success', 'New product added.');
         }
         redirect('admin/products.php');
@@ -90,6 +100,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'name' => $name,
             'slug' => $slug,
             'description' => $description,
+            'category' => $category,
+            'keywords' => $keywords,
             'price' => $price,
             'image' => $imagePath ?? ($product['image'] ?? ''),
             'images' => $imagesJson ?? ($product['images'] ?? ''),
@@ -132,6 +144,23 @@ require __DIR__ . '/../includes/admin_header.php';
       <div class="form-group">
         <label for="description">Description</label>
         <textarea id="description" name="description" required><?= e($product['description'] ?? '') ?></textarea>
+      </div>
+      <div class="form-group">
+        <label for="category">Category</label>
+        <input type="text" id="category" name="category" list="category-list" required maxlength="50"
+               value="<?= e($product['category'] ?? 'comfort') ?>" placeholder="e.g. oversized-tshirts">
+        <datalist id="category-list">
+          <?php foreach ($existingCategories as $existingCategory): ?>
+            <option value="<?= e((string) $existingCategory) ?>">
+          <?php endforeach; ?>
+        </datalist>
+        <small>Type a new category or choose an existing one. It automatically appears as a shop filter.</small>
+      </div>
+      <div class="form-group">
+        <label for="keywords">Search Keywords</label>
+        <input type="text" id="keywords" name="keywords" maxlength="500"
+               value="<?= e($product['keywords'] ?? '') ?>" placeholder="tshirt, bihar, premium, oversized">
+        <small>Comma-separated words help customers find this product.</small>
       </div>
       <div class="form-group">
         <label for="price">Price (₹)</label>

@@ -76,56 +76,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } elseif ($action === 'check_payment_status') {
         if (!empty($order['transaction_id'])) {
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, TERMINALX_STATUS_URL);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
-                'user_token' => TERMINALX_TOKEN,
-                'order_id' => $order['transaction_id']
-            ]));
-            
-            $response = curl_exec($ch);
-            curl_close($ch);
-            
-            if ($response) {
-                $result = json_decode($response, true);
-                if (($result['status'] ?? '') === 'COMPLETED' || ($result['result']['txnStatus'] ?? '') === 'COMPLETED') {
-                    $pdo->prepare(
-                        "UPDATE orders SET
-                            payment_status = 'paid',
-                            status = 'confirmed',
-                            updated_at = datetime('now','localtime')
-                         WHERE id = ?"
-                    )->execute([$id]);
-
-                    add_order_tracking($id, 'confirmed', 'Payment verified automatically via gateway (UTR: ' . ($result['result']['utr'] ?? 'N/A') . ') · Order Confirmed', '', (int) $admin['id']);
-
-                    notify_user(
-                        (int) $order['user_id'],
-                        'Order #' . $id . ' payment verified',
-                        'Your payment was verified automatically. Order is now Confirmed.',
-                        'account/order_view.php?id=' . $id
-                    );
-
+            $check = terminalx_check_payment((string) $order['transaction_id']);
+            if ($check['ok']) {
+                terminalx_apply_status($order, $check, (int) $admin['id']);
+                if ($check['state'] === 'paid') {
                     flash('success', 'Payment verified automatically. Order confirmed.');
-                } elseif (($result['status'] ?? '') === 'FAILED' || ($result['result']['txnStatus'] ?? '') === 'FAILED') {
-                    $pdo->prepare(
-                        "UPDATE orders SET
-                            payment_status = 'failed',
-                            updated_at = datetime('now','localtime')
-                         WHERE id = ?"
-                    )->execute([$id]);
-                    
-                    add_order_tracking($id, $order['status'], 'Payment transaction failed/expired.', '', (int) $admin['id']);
-                    flash('error', 'Payment status is: FAILED.');
+                } elseif ($check['state'] === 'failed') {
+                    flash('error', 'Payment status is FAILED.');
                 } else {
-                    flash('info', 'Payment status is still: ' . ($result['status'] ?? ($result['result']['txnStatus'] ?? 'PENDING')));
+                    flash('info', 'Payment status is still ' . ($check['gateway_status'] ?? 'PENDING') . '.');
                 }
             } else {
-                flash('error', 'Unable to reach payment gateway.');
+                flash('error', (string) ($check['error'] ?? 'Unable to reach payment gateway.'));
             }
         } else {
             flash('error', 'No transaction reference found for this order.');
@@ -133,22 +95,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('admin/order_view.php?id=' . $id);
 
     } elseif ($action === 'approve_payment') {
-        $pdo->prepare(
+        $approve = $pdo->prepare(
             "UPDATE orders SET
                 payment_status = 'paid',
                 status = 'confirmed',
                 updated_at = datetime('now','localtime')
-             WHERE id = ?"
-        )->execute([$id]);
-
-        add_order_tracking($id, 'confirmed', 'Payment manually approved by admin · Order Confirmed', '', (int) $admin['id']);
-
-        notify_user(
-            (int) $order['user_id'],
-            'Order #' . $id . ' payment verified',
-            'Your payment was manually verified by the admin. Order is now Confirmed.',
-            'account/order_view.php?id=' . $id
+             WHERE id = ? AND payment_status != 'paid'"
         );
+        $approve->execute([$id]);
+
+        if ($approve->rowCount() > 0) {
+            add_order_tracking($id, 'confirmed', 'Payment manually approved by admin · Order Confirmed', '', (int) $admin['id']);
+            notify_user(
+                (int) $order['user_id'],
+                'Order #' . $id . ' payment verified',
+                'Your payment was manually verified by the admin. Order is now Confirmed.',
+                'account/order_view.php?id=' . $id
+            );
+        }
 
         flash('success', 'Payment verified and order confirmed.');
         redirect('admin/order_view.php?id=' . $id);

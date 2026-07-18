@@ -886,6 +886,17 @@ a { color: inherit; text-decoration: none; }
   color: var(--text);
   margin-bottom: 6px;
 }
+.deal-rating {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 7px;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+.deal-rating-star { color: #f7941d; font-size: 15px; line-height: 1; }
+.deal-rating strong { color: var(--text); }
 .deal-desc {
   font-size: 0.85rem;
   font-weight: 500;
@@ -2513,6 +2524,16 @@ table.data img.thumb {
   gap: 10px;
 }
 .review-top strong { font-size: 14px; }
+.verified-purchase {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(39, 165, 91, 0.1);
+  color: var(--green);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
 .review-top time { font-size: 11px; color: var(--text-faint); font-weight: 600; }
 .review-body p {
   margin-top: 6px;
@@ -4391,6 +4412,62 @@ table.admin-table img.athumb {
   .site-footer {
     padding-bottom: max(34px, calc(20px + env(safe-area-inset-bottom)));
   }
+}
+
+/* Hosted payment page */
+.payment-shell {
+  width: min(620px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: calc(var(--nav-h) + 44px) 0 72px;
+}
+.payment-summary-card {
+  padding: clamp(24px, 5vw, 42px);
+  border: 1px solid rgba(38, 38, 38, 0.09);
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 22px 55px rgba(38, 38, 38, 0.09);
+}
+.payment-summary-card h1 {
+  margin: 8px 0 10px;
+  font-size: clamp(2rem, 6vw, 3.4rem);
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+.payment-amount {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 28px 0;
+  padding: 20px;
+  border-radius: 16px;
+  background: var(--bg-soft);
+}
+.payment-amount span { color: var(--text-soft); font-weight: 700; }
+.payment-amount strong { color: var(--green); font-size: 1.7rem; }
+.payment-state {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  font-size: 14px;
+}
+.payment-state.success { background: #eaf8ef; color: #156b36; }
+.payment-state.pending { background: #fff7db; color: #7a5900; }
+.payment-state.failed { background: #fff0f1; color: #a91d2c; }
+.payment-state strong { font-size: 16px; }
+.payment-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+.payment-actions form { display: contents; }
+.payment-pay-button { width: 100%; border: 0; cursor: pointer; }
+.payment-pay-button:disabled { opacity: 0.55; cursor: not-allowed; }
+.payment-help { margin: 16px 0; color: var(--text-soft); font-size: 13px; line-height: 1.5; }
+
+@media (max-width: 520px) {
+  .payment-shell { width: min(100% - 20px, 620px); }
+  .payment-summary-card { border-radius: 18px; }
+  .payment-amount { align-items: flex-start; flex-direction: column; }
 }
 
 /* Softer section rhythm on phones */
