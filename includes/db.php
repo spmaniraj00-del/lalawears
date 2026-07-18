@@ -186,6 +186,9 @@ function migrate_schema(PDO $pdo): void
         'courier_name' => "ALTER TABLE orders ADD COLUMN courier_name TEXT DEFAULT ''",
         'tracking_number' => "ALTER TABLE orders ADD COLUMN tracking_number TEXT DEFAULT ''",
         'tracking_note' => "ALTER TABLE orders ADD COLUMN tracking_note TEXT DEFAULT ''",
+        'payment_method' => "ALTER TABLE orders ADD COLUMN payment_method TEXT DEFAULT 'cod'",
+        'payment_status' => "ALTER TABLE orders ADD COLUMN payment_status TEXT DEFAULT 'pending'",
+        'transaction_id' => "ALTER TABLE orders ADD COLUMN transaction_id TEXT DEFAULT ''",
     ];
     foreach ($orderExtras as $col => $sql) {
         if (!isset($orders[$col])) {
