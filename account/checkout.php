@@ -113,12 +113,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             . ($landmark !== '' ? ', Near ' . $landmark : '')
             . ', ' . $city . ', ' . $state . ' - ' . $pincode;
 
+        $payMethod = $_POST['payment_method'] ?? 'upi';
+        if (!in_array($payMethod, ['cod', 'upi'], true)) {
+            $payMethod = 'upi';
+        }
+
         $insert = db()->prepare(
             'INSERT INTO orders (
                 user_id, product_id, product_name, product_image, product_description,
                 price, quantity, size, customer_name, customer_phone, shipping_address,
-                city, state, pincode, landmark, status, notes
-             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                city, state, pincode, landmark, status, notes, payment_method, payment_status
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
 
         $orderIds = [];
@@ -145,13 +150,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $landmark,
                 'pending',
                 $notes,
+                $payMethod,
+                'pending'
             ]);
             $orderId = (int) db()->lastInsertId();
             $orderIds[] = $orderId;
             $lineTotal = (float) $p['price'] * $qty;
             $grandTotal += $lineTotal;
 
-            add_order_tracking($orderId, 'pending', 'Order placed — waiting for confirmation', $city . ', ' . $state);
+            $trackMsg = $payMethod === 'upi' ? 'Order placed — awaiting UPI payment' : 'Order placed — Cash on Delivery';
+            add_order_tracking($orderId, 'pending', $trackMsg, $city . ', ' . $state);
 
             notify_user(
                 (int) $user['id'],
@@ -343,14 +351,25 @@ $qtyValue = $single ? $single['qty'] : 0;
       <section class="checkout-card">
         <h2 class="checkout-card-title no-icon">Payment Method</h2>
 
-        <label class="pay-option selected">
-          <input type="radio" name="payment_method" value="cod" checked>
-          <span class="pay-icon">
+        <div class="pay-option disabled">
+          <input type="radio" name="payment_method" value="cod" disabled>
+          <span class="pay-icon" style="background: var(--bg-soft); color: var(--text-soft);">
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="12" cy="12" r="2.5"></circle><path d="M6 12h.01M18 12h.01"></path></svg>
           </span>
           <span class="pay-body">
-            <span class="pay-name">Cash on Delivery <em class="pay-badge popular">Popular</em></span>
+            <span class="pay-name">Cash on Delivery <em class="pay-badge soon">Coming Soon</em></span>
             <small>Pay when you receive your order</small>
+          </span>
+        </div>
+
+        <label class="pay-option selected">
+          <input type="radio" name="payment_method" value="upi" checked>
+          <span class="pay-icon" style="background:#e8f0fe; color:#1a73e8;">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+          </span>
+          <span class="pay-body">
+            <span class="pay-name">UPI / QR Code <em class="pay-badge popular" style="background:#1a73e8;">Instant</em></span>
+            <small>Pay instantly via dynamic QR code scanning</small>
           </span>
         </label>
 
@@ -359,18 +378,8 @@ $qtyValue = $single ? $single['qty'] : 0;
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
           </span>
           <span class="pay-body">
-            <span class="pay-name">Card Payment <em class="pay-badge soon">Coming Soon</em></span>
+            <span class="pay-name">Card Payment <em class="pay-badge soon">CoSoonming </em></span>
             <small>Visa, Mastercard, RuPay</small>
-          </span>
-        </div>
-
-        <div class="pay-option disabled">
-          <span class="pay-icon">
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
-          </span>
-          <span class="pay-body">
-            <span class="pay-name">UPI <em class="pay-badge soon">Coming Soon</em></span>
-            <small>Pay with any UPI app</small>
           </span>
         </div>
       </section>
@@ -402,5 +411,21 @@ $qtyValue = $single ? $single['qty'] : 0;
     </aside>
   </form>
 </main>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const radioButtons = document.querySelectorAll('input[name="payment_method"]');
+    radioButtons.forEach(radio => {
+        radio.addEventListener('change', function() {
+            document.querySelectorAll('.pay-option').forEach(el => {
+                el.classList.remove('selected');
+            });
+            if (this.checked) {
+                this.closest('.pay-option').classList.add('selected');
+            }
+        });
+    });
+});
+</script>
 
 <?php require __DIR__ . '/../includes/footer.php'; ?>
