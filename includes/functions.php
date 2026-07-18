@@ -248,7 +248,7 @@ function set_security_headers(): void
         "Content-Security-Policy: default-src 'self'; "
         . "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://www.gstatic.com; "
         . "font-src 'self' https://fonts.gstatic.com data:; "
-        . "img-src 'self' data: blob: https://lh3.googleusercontent.com https://*.googleusercontent.com https://www.gstatic.com https://www.google.com; "
+        . "img-src 'self' data: blob: https://api.qrserver.com https://lh3.googleusercontent.com https://*.googleusercontent.com https://www.gstatic.com https://www.google.com; "
         . "script-src 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com; "
         . "connect-src 'self' https://api.resend.com https://www.google.com https://accounts.google.com https://oauth2.googleapis.com; "
         . "frame-src https://www.google.com https://accounts.google.com; "

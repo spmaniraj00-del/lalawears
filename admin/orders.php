@@ -102,6 +102,7 @@ require __DIR__ . '/../includes/admin_header.php';
             <th>Product</th>
             <th>Delivery</th>
             <th>Total</th>
+            <th>Payment</th>
             <th>Status</th>
             <th>Quick Update</th>
             <th>Actions</th>
@@ -135,6 +136,24 @@ require __DIR__ . '/../includes/admin_header.php';
                 <?php endif; ?>
               </td>
               <td><strong><?= e(money_inr((float) $row['price'] * (int) $row['quantity'])) ?></strong></td>
+              <td>
+                <span style="font-weight: 800; font-size: 11px; text-transform: uppercase; display: block; margin-bottom: 2px;">
+                  <?= ($row['payment_method'] ?? 'cod') === 'upi' ? 'UPI' : 'COD' ?>
+                </span>
+                <?php if (($row['payment_method'] ?? 'cod') === 'upi'): ?>
+                  <?php if ($row['payment_status'] === 'pending'): ?>
+                    <span class="badge pending" style="background:#fff3e0; color:#e65100; font-size:10px; padding:2px 6px;">Unpaid</span>
+                  <?php elseif ($row['payment_status'] === 'submitted'): ?>
+                    <span class="badge pending" style="background:#e3f2fd; color:#0d47a1; font-size:10px; padding:2px 6px; border:1px solid #90caf9;" title="UTR: <?= e($row['transaction_id']) ?>">Verify UTR</span>
+                  <?php elseif ($row['payment_status'] === 'paid'): ?>
+                    <span class="badge shipped" style="background:#e8f5e9; color:#1b5e20; font-size:10px; padding:2px 6px;">Paid</span>
+                  <?php elseif ($row['payment_status'] === 'failed'): ?>
+                    <span class="badge cancelled" style="background:#ffebee; color:#b71c1c; font-size:10px; padding:2px 6px;">Rejected</span>
+                  <?php endif; ?>
+                <?php else: ?>
+                  <span class="badge pending" style="background:#f5f5f5; color:#616161; font-size:10px; padding:2px 6px;">COD</span>
+                <?php endif; ?>
+              </td>
               <td><span class="badge <?= e($row['status']) ?>"><?= e(order_status_label($row['status'])) ?></span></td>
               <td>
                 <form method="post" class="admin-row-actions">

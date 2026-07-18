@@ -74,6 +74,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash('success', 'Tracking updated. Customer notified.');
             redirect('admin/order_view.php?id=' . $id);
         }
+    } elseif ($action === 'approve_payment') {
+        $pdo->prepare(
+            "UPDATE orders SET
+                payment_status = 'paid',
+                status = 'confirmed',
+                updated_at = datetime('now','localtime')
+             WHERE id = ?"
+        )->execute([$id]);
+
+        add_order_tracking($id, 'confirmed', 'Payment verified and approved by admin · Order Confirmed', '', (int) $admin['id']);
+
+        notify_user(
+            (int) $order['user_id'],
+            'Order #' . $id . ' payment verified',
+            'Your payment UTR ' . $order['transaction_id'] . ' was verified. Order is now Confirmed.',
+            'account/order_view.php?id=' . $id
+        );
+
+        flash('success', 'Payment verified and order confirmed.');
+        redirect('admin/order_view.php?id=' . $id);
+
+    } elseif ($action === 'reject_payment') {
+        $pdo->prepare(
+            "UPDATE orders SET
+                payment_status = 'failed',
+                updated_at = datetime('now','localtime')
+             WHERE id = ?"
+        )->execute([$id]);
+
+        add_order_tracking($id, $order['status'], 'Payment UTR ' . $order['transaction_id'] . ' rejected by admin', '', (int) $admin['id']);
+
+        notify_user(
+            (int) $order['user_id'],
+            'Order #' . $id . ' payment rejected',
+            'The payment UTR ' . $order['transaction_id'] . ' you submitted was rejected. Please verify and resubmit.',
+            'account/order_view.php?id=' . $id
+        );
+
+        flash('success', 'Payment rejected. Customer notified.');
+        redirect('admin/order_view.php?id=' . $id);
     }
 }
 
@@ -126,6 +166,25 @@ require __DIR__ . '/../includes/admin_header.php';
           <div class="detail-row"><span>Price</span><strong><?= e(money_inr($order['price'])) ?></strong></div>
           <div class="detail-row"><span>Qty / Size</span><strong><?= (int) $order['quantity'] ?> · <?= e($order['size']) ?></strong></div>
           <div class="detail-row"><span>Total</span><strong><?= e(money_inr((float) $order['price'] * (int) $order['quantity'])) ?></strong></div>
+          <div class="detail-row"><span>Payment Method</span><strong><?= ($order['payment_method'] ?? 'cod') === 'upi' ? 'UPI / QR Code' : 'Cash on Delivery' ?></strong></div>
+          <?php if (($order['payment_method'] ?? 'cod') === 'upi'): ?>
+            <div class="detail-row"><span>Payment Status</span>
+              <strong>
+                <?php if ($order['payment_status'] === 'pending'): ?>
+                  <span style="color:#e65100;">Unpaid (Pending)</span>
+                <?php elseif ($order['payment_status'] === 'submitted'): ?>
+                  <span style="color:#0d47a1;">Awaiting Verification</span>
+                <?php elseif ($order['payment_status'] === 'paid'): ?>
+                  <span style="color:#2e7d32;">Paid & Verified</span>
+                <?php elseif ($order['payment_status'] === 'failed'): ?>
+                  <span style="color:#c62828;">Rejected (Failed)</span>
+                <?php endif; ?>
+              </strong>
+            </div>
+            <?php if ($order['transaction_id']): ?>
+              <div class="detail-row"><span>UPI UTR / Ref</span><strong><?= e($order['transaction_id']) ?></strong></div>
+            <?php endif; ?>
+          <?php endif; ?>
           <div class="detail-row"><span>Customer</span><strong><?= e($displayName) ?></strong></div>
           <div class="detail-row"><span>Phone</span><strong>+91 <?= e($displayPhone) ?></strong></div>
           <?php if ($order['account_email']): ?>
@@ -160,6 +219,31 @@ require __DIR__ . '/../includes/admin_header.php';
 
     <div class="admin-two-col" style="margin-top:36px;">
       <div>
+        <?php if (($order['payment_method'] ?? 'cod') === 'upi' && $order['payment_status'] === 'submitted'): ?>
+          <div style="background: #e3f2fd; border: 1.5px solid #90caf9; padding: 20px; border-radius: 16px; margin-bottom: 28px;">
+            <h3 style="margin-top:0; font-size:1.2rem; font-weight:800; color:#0d47a1; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="8"></line></svg>
+              Payment Verification Required
+            </h3>
+            <p style="font-size: 0.9rem; color: #333; margin: 0 0 16px; line-height: 1.4;">
+              Customer submitted a payment of <strong><?= e(money_inr((float) $order['price'] * (int) $order['quantity'])) ?></strong>.<br>
+              UPI UTR/Reference No: <strong style="font-size: 1.05rem; background:#fff; padding:2px 6px; border-radius:4px; border:1px solid rgba(0,0,0,0.1); letter-spacing:0.5px;"><?= e($order['transaction_id']) ?></strong>
+            </p>
+            <div style="display:flex; gap:12px;">
+              <form method="post" style="flex:1;">
+                <?= csrf_field() ?>
+                <input type="hidden" name="action" value="approve_payment">
+                <button type="submit" class="btn-admin-primary" style="width:100%; justify-content:center; background:#2e7d32; border:none; color:#fff; padding:10px; border-radius:8px; font-weight:700; cursor:pointer;">Approve & Confirm</button>
+              </form>
+              <form method="post" style="flex:1;">
+                <?= csrf_field() ?>
+                <input type="hidden" name="action" value="reject_payment">
+                <button type="submit" class="btn-admin-outline" style="width:100%; justify-content:center; border:1px solid #c62828; color:#c62828; background:none; padding:10px; border-radius:8px; font-weight:700; cursor:pointer;">Reject</button>
+              </form>
+            </div>
+          </div>
+        <?php endif; ?>
+
         <h2 style="font-size:1.4rem;font-weight:900;text-transform:uppercase;margin-bottom:16px;">Update / Track</h2>
         <form method="post">
           <?= csrf_field() ?>

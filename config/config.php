@@ -13,6 +13,8 @@ define('UPLOAD_DIR', APP_ROOT . '/assets/uploads');
 
 define('WHATSAPP_NUMBER', '916205484119');
 define('WHATSAPP_URL', 'https://api.whatsapp.com/send?phone=' . WHATSAPP_NUMBER . '&text=Hello%2C%20I%20want%20to%20know%20about%20apparel.%20Could%20you%20please%20send%20the%20full%20details%3F');
+define('UPI_ID', '6205484119@ybl');
+define('UPI_NAME', 'LALA WEARS');
 define('CONTACT_PHONE', '+91 6205484119');
 define('CONTACT_EMAIL', 'dibyanshu.1324@gmail.com');
 define('CONTACT_LOCATION', 'Bettiah, Bihar');
