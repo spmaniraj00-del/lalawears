@@ -31,6 +31,8 @@ if (($order['payment_method'] ?? '') === 'upi' && ($order['payment_status'] ?? '
     curl_setopt($ch, CURLOPT_URL, TERMINALX_STATUS_URL);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
         'user_token' => TERMINALX_TOKEN,
         'order_id' => $order['transaction_id']
@@ -114,6 +116,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         curl_setopt($ch, CURLOPT_URL, TERMINALX_CREATE_URL);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
 
         $response = curl_exec($ch);
@@ -135,12 +139,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header('Location: ' . $result['result']['payment_url']);
                 exit;
             } else {
-                flash('error', 'Payment gateway error: ' . ($result['message'] ?? 'Could not create transaction.'));
+                flash('error', 'Payment gateway error: ' . ($result['message'] ?? json_encode($result) ?? 'Could not create transaction.'));
             }
         } else {
             flash('error', 'Unable to reach payment gateway: ' . $err);
         }
         redirect('account/order_view.php?id=' . $id);
+    } elseif ($action === 'cancel_order') {
+        $reason = trim($_POST['reason'] ?? '');
+        if ($reason === '') {
+            $reason = 'No reason provided';
+        }
+        
+        if (in_array($order['status'], ['shipped', 'delivered', 'cancelled'], true)) {
+            flash('error', 'This order cannot be cancelled as it is already ' . $order['status'] . '.');
+        } else {
+            $pdo = db();
+            $pdo->prepare(
+                "UPDATE orders SET
+                    status = 'cancelled',
+                    cancel_reason = ?,
+                    updated_at = datetime('now','localtime')
+                 WHERE id = ?"
+            )->execute([$reason, $id]);
+
+            add_order_tracking(
+                $id,
+                'cancelled',
+                'Order cancelled by customer. Reason: ' . $reason,
+                (string) ($order['city'] ?? '')
+            );
+
+            notify_admins(
+                'Order #' . $id . ' cancelled by customer',
+                'Customer ' . ($order['customer_name'] ?: $user['name']) . ' cancelled Order #' . $id . '. Reason: ' . $reason,
+                'admin/order_view.php?id=' . $id
+            );
+
+            flash('success', 'Order has been cancelled successfully.');
+            
+            // Refresh order data
+            $stmt->execute([$id]);
+            $order = $stmt->fetch();
+        }
     }
 }
 
@@ -335,6 +376,33 @@ require __DIR__ . '/../includes/header.php';
             <?php endforeach; ?>
           <?php endif; ?>
         </div>
+
+        <?php if ($user['role'] === 'user' && !in_array($order['status'], ['shipped', 'delivered', 'cancelled'], true)): ?>
+          <div class="checkout-card" style="margin-top: 28px; padding: 20px; border: 1.5px solid rgba(198, 40, 40, 0.2); border-radius: 20px; background: #fff8f8; box-shadow: 0 4px 16px rgba(198, 40, 40, 0.04);">
+            <h3 style="font-size: 1.15rem; font-weight: 800; color: #c62828; margin-top: 0; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+              Cancel Order
+            </h3>
+            <p style="font-size: 0.88rem; color: var(--text-soft); margin-bottom: 16px;">
+              If you wish to cancel this order, please provide a reason and confirm below.
+            </p>
+            <form method="post" onsubmit="return confirm('Are you sure you want to cancel this order?');">
+              <?= csrf_field() ?>
+              <input type="hidden" name="action" value="cancel_order">
+              <div class="form-group" style="margin-bottom: 12px;">
+                <textarea name="reason" placeholder="Reason for cancellation (e.g. Changed my mind, Ordered wrong size)..." required style="width: 100%; min-height: 80px; padding: 12px; border: 1.5px solid rgba(0,0,0,0.1); border-radius: 10px; font-family: inherit; font-size: 0.95rem; outline: none; resize: vertical; color: var(--text);"></textarea>
+              </div>
+              <button type="submit" class="btn" style="background: #c62828; color: #fff; border: none; padding: 12px 20px; border-radius: 10px; font-weight: 700; cursor: pointer; transition: background 0.2s;">
+                Cancel Order
+              </button>
+            </form>
+          </div>
+        <?php elseif ($order['status'] === 'cancelled'): ?>
+          <div class="checkout-card" style="margin-top: 28px; padding: 20px; border: 1.5px solid rgba(0,0,0,0.06); border-radius: 20px; background: #fafafa; color: var(--text-soft); box-shadow: 0 4px 16px rgba(0,0,0,0.02);">
+            <strong style="color: var(--text); display: block; margin-bottom: 4px; font-size: 1rem;">Order Cancelled</strong>
+            Reason: <em><?= e($order['cancel_reason'] ?: 'No reason provided') ?></em>
+          </div>
+        <?php endif; ?>
 
         <div style="margin-top:28px;display:flex;flex-wrap:wrap;gap:12px;">
           <a class="btn-outline" href="<?= e(url($user['role'] === 'admin' ? 'admin/orders.php' : 'account/index.php')) ?>">Back</a>

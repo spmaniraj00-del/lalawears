@@ -80,6 +80,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             curl_setopt($ch, CURLOPT_URL, TERMINALX_STATUS_URL);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
             curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
                 'user_token' => TERMINALX_TOKEN,
                 'order_id' => $order['transaction_id']
@@ -254,6 +256,9 @@ require __DIR__ . '/../includes/admin_header.php';
           <?php endif; ?>
           <?php if ($order['tracking_number']): ?>
             <div class="detail-row"><span>Tracking No.</span><strong><?= e($order['tracking_number']) ?></strong></div>
+          <?php endif; ?>
+          <?php if ($order['status'] === 'cancelled' && $order['cancel_reason']): ?>
+            <div class="detail-row" style="color:#c62828;"><span style="color:#c62828;font-weight:700;">Cancel Reason</span><strong style="text-align:right;max-width:65%;"><?= e($order['cancel_reason']) ?></strong></div>
           <?php endif; ?>
         </div>
 
