@@ -1,9 +1,9 @@
 FROM php:8.3-cli-bookworm
 
-# SQLite (same as local)
+# SQLite, PostgreSQL, and MySQL drivers
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends libsqlite3-dev \
-	&& docker-php-ext-install pdo_sqlite \
+	&& apt-get install -y --no-install-recommends libsqlite3-dev libpq-dev \
+	&& docker-php-ext-install pdo_sqlite pdo_mysql pdo_pgsql \
 	&& rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

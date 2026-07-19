@@ -43,6 +43,13 @@ $__local = [
     'RECAPTCHA_SITE_KEY' => getenv('RECAPTCHA_SITE_KEY') ?: '',
     'RECAPTCHA_SECRET_KEY' => getenv('RECAPTCHA_SECRET_KEY') ?: '',
     'OTP_SHOW_ON_SITE' => true,
+    'DB_TYPE' => getenv('DB_TYPE') ?: 'sqlite', // 'sqlite', 'mysql', or 'pgsql'
+    'DB_HOST' => getenv('DB_HOST') ?: '',
+    'DB_PORT' => getenv('DB_PORT') ?: '',
+    'DB_DATABASE' => getenv('DB_DATABASE') ?: '',
+    'DB_USERNAME' => getenv('DB_USERNAME') ?: '',
+    'DB_PASSWORD' => getenv('DB_PASSWORD') ?: '',
+    'DB_URL' => getenv('DATABASE_URL') ?: getenv('DB_URL') ?: '',
 ];
 $localFile = APP_ROOT . '/config/config.local.php';
 if (is_file($localFile)) {
@@ -82,6 +89,14 @@ define('OTP_EXPIRY_MINUTES', 5);
 define('OTP_RESEND_SECONDS', 30);
 // Show OTP on verify page (dev / easy login). Set false in production.
 define('OTP_SHOW_ON_SITE', array_key_exists('OTP_SHOW_ON_SITE', $__local) ? (bool) $__local['OTP_SHOW_ON_SITE'] : true);
+
+define('DB_TYPE', (string) ($__local['DB_TYPE'] ?? 'sqlite'));
+define('DB_HOST', (string) ($__local['DB_HOST'] ?? ''));
+define('DB_PORT', (string) ($__local['DB_PORT'] ?? ''));
+define('DB_DATABASE', (string) ($__local['DB_DATABASE'] ?? ''));
+define('DB_USERNAME', (string) ($__local['DB_USERNAME'] ?? ''));
+define('DB_PASSWORD', (string) ($__local['DB_PASSWORD'] ?? ''));
+define('DB_URL', (string) ($__local['DB_URL'] ?? ''));
 
 // Canonical public URL (optional). Example: https://lalawearscraftedforstyle.com
 $__appUrl = getenv('APP_URL') ?: (string) ($__local['APP_URL'] ?? '');

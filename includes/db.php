@@ -11,18 +11,71 @@ function db(): PDO
     }
 
     try {
-        $dir = dirname(DB_PATH);
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0777, true);
+        $dbType = strtolower(DB_TYPE);
+        $dbUrl = DB_URL;
+
+        if ($dbUrl !== '') {
+            $parsed = parse_url($dbUrl);
+            if (isset($parsed['scheme'])) {
+                if ($parsed['scheme'] === 'postgres' || $parsed['scheme'] === 'postgresql') {
+                    $dbType = 'pgsql';
+                } elseif ($parsed['scheme'] === 'mysql') {
+                    $dbType = 'mysql';
+                }
+                
+                $host = $parsed['host'] ?? '';
+                $port = $parsed['port'] ?? '';
+                $user = $parsed['user'] ?? '';
+                $pass = $parsed['pass'] ?? '';
+                $path = ltrim($parsed['path'] ?? '', '/');
+            }
         }
 
-        $needsSeed = !file_exists(DB_PATH);
-        $pdo = new PDO('sqlite:' . DB_PATH, null, null, [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES => false,
-        ]);
-        $pdo->exec('PRAGMA foreign_keys = ON');
+        if ($dbType === 'mysql' || $dbType === 'pgsql') {
+            if ($dbUrl !== '' && isset($host)) {
+                $dsn = "{$dbType}:host={$host};dbname={$path}";
+                if ($port !== '') {
+                    $dsn .= ";port={$port}";
+                }
+                $username = $user;
+                $password = $pass;
+            } else {
+                $dsn = "{$dbType}:host=" . DB_HOST . ";dbname=" . DB_DATABASE;
+                if (DB_PORT !== '') {
+                    $dsn .= ";port=" . DB_PORT;
+                }
+                $username = DB_USERNAME;
+                $password = DB_PASSWORD;
+            }
+
+            // Connection with timeout for fast fallback / resilience
+            $pdo = new PDO($dsn, $username, $password, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false,
+                PDO::ATTR_TIMEOUT => 5,
+            ]);
+            
+            $needsSeed = false; // Remote DBs usually managed manually, but we can verify tables
+            $tableCheck = $pdo->query("SELECT 1 FROM information_schema.tables WHERE table_name = 'users' LIMIT 1");
+            if (!$tableCheck || $tableCheck->fetchColumn() === false) {
+                $needsSeed = true;
+            }
+        } else {
+            // SQLite Fallback
+            $dir = dirname(DB_PATH);
+            if (!is_dir($dir)) {
+                @mkdir($dir, 0777, true);
+            }
+
+            $needsSeed = !file_exists(DB_PATH);
+            $pdo = new PDO('sqlite:' . DB_PATH, null, null, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false,
+            ]);
+            $pdo->exec('PRAGMA foreign_keys = ON');
+        }
 
         init_schema($pdo);
         migrate_schema($pdo);
@@ -36,7 +89,7 @@ function db(): PDO
         <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Database Setup Error | LALA WEARS</title>
+          <title>Database Connection Error | LALA WEARS</title>
           <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;700;900&display=swap" rel="stylesheet">
           <style>
             body { font-family: "League Spartan", sans-serif; background: #fdf8f3; color: #262626; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
@@ -44,22 +97,16 @@ function db(): PDO
             h1 { font-size: 2.2rem; font-weight: 900; text-transform: uppercase; margin: 0 0 16px; color: #e4a4bd; }
             p { font-size: 1.1rem; line-height: 1.5; color: #595959; margin: 0 0 24px; }
             .steps { text-align: left; background: #f5f0eb; padding: 20px; border-radius: 16px; font-size: 0.95rem; font-weight: 600; color: #262626; line-height: 1.6; }
-            .steps ol { margin: 8px 0 0; padding-left: 20px; }
             .code { font-family: monospace; background: #fff; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.08); }
           </style>
         </head>
         <body>
           <div class="card">
-            <h1>Database Error</h1>
-            <p>We could not initialize the database. This usually happens when the server does not have permission to write to the database folder.</p>
+            <h1>Database Connection Error</h1>
+            <p>' . htmlspecialchars($e->getMessage()) . '</p>
             <div class="steps">
-              <strong>How to fix on InfinityFree:</strong>
-              <ol>
-                <li>Open the <strong>File Manager</strong> in your InfinityFree panel.</li>
-                <li>Go to <span class="code">htdocs</span>.</li>
-                <li>Right-click the <span class="code">data</span> folder and click <strong>Permissions</strong> (or Chmod).</li>
-                <li>Set permissions to <strong>777</strong> (check Write permissions) and save.</li>
-              </ol>
+              <strong>Check your DB variables:</strong>
+              <p>Verify that your <span class="code">DB_TYPE</span>, <span class="code">DB_HOST</span>, <span class="code">DB_DATABASE</span>, or <span class="code">DATABASE_URL</span> environment variables are set correctly on your hosting platform (Railway, etc.).</p>
             </div>
           </div>
         </body>
@@ -70,96 +117,137 @@ function db(): PDO
     return $pdo;
 }
 
-function init_schema(PDO $pdo): void
-{
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            phone TEXT DEFAULT '',
-            email TEXT DEFAULT '',
-            password_hash TEXT DEFAULT '',
-            google_id TEXT UNIQUE,
-            avatar TEXT DEFAULT '',
-            role TEXT NOT NULL DEFAULT 'user' CHECK(role IN ('user','admin')),
-            username TEXT UNIQUE,
-            is_active INTEGER NOT NULL DEFAULT 1,
-            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-            updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
-        );
-
-        CREATE TABLE IF NOT EXISTS products (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            slug TEXT NOT NULL UNIQUE,
-            description TEXT NOT NULL DEFAULT '',
-            price REAL NOT NULL CHECK(price >= 0),
-            image TEXT NOT NULL DEFAULT '',
-            stock INTEGER NOT NULL DEFAULT 50,
-            is_active INTEGER NOT NULL DEFAULT 1,
-            sort_order INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-            updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
-        );
-
-            CREATE TABLE IF NOT EXISTS orders (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            product_id INTEGER,
-            product_name TEXT NOT NULL,
-            product_image TEXT DEFAULT '',
-            product_description TEXT DEFAULT '',
-            price REAL NOT NULL,
-            quantity INTEGER NOT NULL DEFAULT 1,
-            size TEXT DEFAULT 'M',
-            customer_name TEXT DEFAULT '',
-            customer_phone TEXT DEFAULT '',
-            shipping_address TEXT DEFAULT '',
-            city TEXT DEFAULT '',
-            state TEXT DEFAULT '',
-            pincode TEXT DEFAULT '',
-            landmark TEXT DEFAULT '',
-            status TEXT NOT NULL DEFAULT 'pending'
-                CHECK(status IN ('pending','confirmed','shipped','delivered','cancelled')),
-            notes TEXT DEFAULT '',
-            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-            updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-            FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS notifications (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            title TEXT NOT NULL,
-            message TEXT NOT NULL,
-            link TEXT DEFAULT '',
-            is_read INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        );
-
-        CREATE TABLE IF NOT EXISTS login_attempts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            identifier TEXT NOT NULL,
-            ip_address TEXT NOT NULL,
-            attempted_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
-        );
-
-        CREATE TABLE IF NOT EXISTS settings (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL
-        );
-    ");
-}
-
 function table_columns(PDO $pdo, string $table): array
 {
     $cols = [];
-    foreach ($pdo->query("PRAGMA table_info({$table})") as $row) {
-        $cols[$row['name']] = true;
+    $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+    if ($driver === 'sqlite') {
+        foreach ($pdo->query("PRAGMA table_info({$table})") as $row) {
+            $cols[$row['name']] = true;
+        }
+    } elseif ($driver === 'mysql') {
+        $stmt = $pdo->prepare("SELECT column_name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ?");
+        $stmt->execute([$table]);
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $col) {
+            $cols[$col] = true;
+        }
+    } elseif ($driver === 'pgsql') {
+        $stmt = $pdo->prepare("SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = ?");
+        $stmt->execute([$table]);
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $col) {
+            $cols[$col] = true;
+        }
     }
     return $cols;
+}
+
+function init_schema(PDO $pdo): void
+{
+    $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+    $ai = 'INTEGER PRIMARY KEY AUTOINCREMENT';
+    $text = 'TEXT';
+    $real = 'REAL';
+    $now = "datetime('now','localtime')";
+
+    if ($driver === 'mysql') {
+        $ai = 'INT AUTO_INCREMENT PRIMARY KEY';
+        $text = 'VARCHAR(255)';
+        $real = 'DECIMAL(10,2)';
+        $now = 'NOW()';
+    } elseif ($driver === 'pgsql') {
+        $ai = 'SERIAL PRIMARY KEY';
+        $text = 'VARCHAR(255)';
+        $real = 'DECIMAL(10,2)';
+        $now = "timezone('Asia/Kolkata', now())";
+    }
+
+    $longText = ($driver === 'sqlite') ? 'TEXT' : 'TEXT';
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS users (
+            id {$ai},
+            name {$text} NOT NULL,
+            phone {$text} DEFAULT '',
+            email {$text} DEFAULT '',
+            password_hash {$text} DEFAULT '',
+            google_id {$text} UNIQUE,
+            avatar {$text} DEFAULT '',
+            role {$text} NOT NULL DEFAULT 'user',
+            username {$text} UNIQUE,
+            is_active INT NOT NULL DEFAULT 1,
+            created_at TIMESTAMP NOT NULL DEFAULT {$now},
+            updated_at TIMESTAMP NOT NULL DEFAULT {$now}
+        );
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS products (
+            id {$ai},
+            name {$text} NOT NULL,
+            slug {$text} NOT NULL UNIQUE,
+            description {$longText} NOT NULL,
+            price {$real} NOT NULL DEFAULT 0.00,
+            image {$text} NOT NULL DEFAULT '',
+            stock INT NOT NULL DEFAULT 50,
+            is_active INT NOT NULL DEFAULT 1,
+            sort_order INT NOT NULL DEFAULT 0,
+            created_at TIMESTAMP NOT NULL DEFAULT {$now},
+            updated_at TIMESTAMP NOT NULL DEFAULT {$now}
+        );
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS orders (
+            id {$ai},
+            user_id INT NOT NULL,
+            product_id INT,
+            product_name {$text} NOT NULL,
+            product_image {$text} DEFAULT '',
+            product_description {$longText} DEFAULT '',
+            price {$real} NOT NULL,
+            quantity INT NOT NULL DEFAULT 1,
+            size {$text} DEFAULT 'M',
+            customer_name {$text} DEFAULT '',
+            customer_phone {$text} DEFAULT '',
+            shipping_address {$longText} DEFAULT '',
+            city {$text} DEFAULT '',
+            state {$text} DEFAULT '',
+            pincode {$text} DEFAULT '',
+            landmark {$text} DEFAULT '',
+            status {$text} NOT NULL DEFAULT 'pending',
+            notes {$longText} DEFAULT '',
+            created_at TIMESTAMP NOT NULL DEFAULT {$now},
+            updated_at TIMESTAMP NOT NULL DEFAULT {$now}
+        );
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS notifications (
+            id {$ai},
+            user_id INT NOT NULL,
+            title {$text} NOT NULL,
+            message {$longText} NOT NULL,
+            link {$text} DEFAULT '',
+            is_read INT NOT NULL DEFAULT 0,
+            created_at TIMESTAMP NOT NULL DEFAULT {$now}
+        );
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS login_attempts (
+            id {$ai},
+            identifier {$text} NOT NULL,
+            ip_address {$text} NOT NULL,
+            attempted_at TIMESTAMP NOT NULL DEFAULT {$now}
+        );
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS settings (
+            `key` {$text} PRIMARY KEY,
+            `value` {$longText} NOT NULL
+        );
+    ");
 }
 
 function migrate_schema(PDO $pdo): void
@@ -200,71 +288,87 @@ function migrate_schema(PDO $pdo): void
         }
     }
 
+    $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+    $ai = 'INTEGER PRIMARY KEY AUTOINCREMENT';
+    $text = 'TEXT';
+    $real = 'REAL';
+    $now = "datetime('now','localtime')";
+
+    if ($driver === 'mysql') {
+        $ai = 'INT AUTO_INCREMENT PRIMARY KEY';
+        $text = 'VARCHAR(255)';
+        $real = 'DECIMAL(10,2)';
+        $now = 'NOW()';
+    } elseif ($driver === 'pgsql') {
+        $ai = 'SERIAL PRIMARY KEY';
+        $text = 'VARCHAR(255)';
+        $real = 'DECIMAL(10,2)';
+        $now = "timezone('Asia/Kolkata', now())";
+    }
+
+    $longText = 'TEXT';
+
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS notifications (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            title TEXT NOT NULL,
-            message TEXT NOT NULL,
-            link TEXT DEFAULT '',
-            is_read INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            id {$ai},
+            user_id INT NOT NULL,
+            title {$text} NOT NULL,
+            message {$longText} NOT NULL,
+            link {$text} DEFAULT '',
+            is_read INT NOT NULL DEFAULT 0,
+            created_at TIMESTAMP NOT NULL DEFAULT {$now}
         );
 
         CREATE TABLE IF NOT EXISTS otp_codes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            phone TEXT NOT NULL,
-            email TEXT NOT NULL,
-            name TEXT DEFAULT '',
-            code_hash TEXT NOT NULL,
-            attempts INTEGER NOT NULL DEFAULT 0,
-            expires_at TEXT NOT NULL,
-            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+            id {$ai},
+            phone {$text} NOT NULL,
+            email {$text} NOT NULL,
+            name {$text} DEFAULT '',
+            code_hash {$text} NOT NULL,
+            attempts INT NOT NULL DEFAULT 0,
+            expires_at {$text} NOT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT {$now}
         );
 
         CREATE TABLE IF NOT EXISTS order_tracking (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            order_id INTEGER NOT NULL,
-            status TEXT NOT NULL,
-            note TEXT DEFAULT '',
-            location TEXT DEFAULT '',
-            created_by INTEGER,
-            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-            FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+            id {$ai},
+            order_id INT NOT NULL,
+            status {$text} NOT NULL,
+            note {$longText} DEFAULT '',
+            location {$text} DEFAULT '',
+            created_by INT,
+            created_at TIMESTAMP NOT NULL DEFAULT {$now}
         );
 
         CREATE TABLE IF NOT EXISTS password_resets (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT NOT NULL,
-            token TEXT NOT NULL UNIQUE,
-            expires_at TEXT NOT NULL,
-            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+            id {$ai},
+            email {$text} NOT NULL,
+            token {$text} NOT NULL UNIQUE,
+            expires_at {$text} NOT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT {$now}
         );
 
         CREATE TABLE IF NOT EXISTS reviews (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            product_id INTEGER NOT NULL,
-            user_id INTEGER NOT NULL,
-            rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
-            comment TEXT DEFAULT '',
-            images TEXT DEFAULT '',
-            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-            FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            id {$ai},
+            product_id INT NOT NULL,
+            user_id INT NOT NULL,
+            rating INT NOT NULL,
+            comment {$longText} DEFAULT '',
+            images {$longText} DEFAULT '',
+            created_at TIMESTAMP NOT NULL DEFAULT {$now}
         );
 
         CREATE TABLE IF NOT EXISTS support_messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            thread_key TEXT NOT NULL,
-            user_id INTEGER,
-            name TEXT NOT NULL DEFAULT '',
-            email TEXT DEFAULT '',
-            phone TEXT DEFAULT '',
-            message TEXT NOT NULL,
-            sender TEXT NOT NULL DEFAULT 'customer' CHECK(sender IN ('customer','admin')),
-            is_read INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+            id {$ai},
+            thread_key {$text} NOT NULL,
+            user_id INT,
+            name {$text} NOT NULL DEFAULT '',
+            email {$text} DEFAULT '',
+            phone {$text} DEFAULT '',
+            message {$longText} NOT NULL,
+            sender {$text} NOT NULL DEFAULT 'customer',
+            is_read INT NOT NULL DEFAULT 0,
+            created_at TIMESTAMP NOT NULL DEFAULT {$now}
         );
     ");
 
@@ -293,19 +397,36 @@ function migrate_schema(PDO $pdo): void
              SELECT MAX(id) FROM reviews GROUP BY product_id, user_id
          )'
     );
-    $pdo->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_reviews_product_user ON reviews(product_id, user_id)');
+    
+    // Check if unique index exists or create it
+    try {
+        if ($driver === 'sqlite') {
+            $pdo->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_reviews_product_user ON reviews(product_id, user_id)');
+        } else {
+            $pdo->exec('CREATE UNIQUE INDEX idx_reviews_product_user ON reviews(product_id, user_id)');
+        }
+    } catch (PDOException $e) {
+        // Index might already exist
+    }
 
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS wishlists (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            product_id INTEGER NOT NULL,
-            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-            UNIQUE(user_id, product_id),
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-            FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+            id {$ai},
+            user_id INT NOT NULL,
+            product_id INT NOT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT {$now}
         )
     ");
+    
+    try {
+        if ($driver === 'sqlite') {
+            $pdo->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_wishlists_user_product ON wishlists(user_id, product_id)');
+        } else {
+            $pdo->exec('CREATE UNIQUE INDEX idx_wishlists_user_product ON wishlists(user_id, product_id)');
+        }
+    } catch (PDOException $e) {
+        // Index might already exist
+    }
 }
 
 function admin_exists(PDO $pdo): bool
