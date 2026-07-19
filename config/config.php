@@ -191,6 +191,10 @@ function force_https_redirect(): void
     $forceHttps = !in_array(strtolower((string) (getenv('FORCE_HTTPS') ?: '')), ['0', 'false', 'off'], true);
     $forceHost = !in_array(strtolower((string) (getenv('FORCE_CANONICAL_HOST') ?: '')), ['0', 'false', 'off'], true);
 
+    if (str_ends_with($currentHost, '.railway.app')) {
+        $forceHost = false;
+    }
+
     $needsHttps = $forceHttps && $forwardedProto === 'http';
     $needsHost = $forceHost && $canonicalHost !== '' && $currentHost !== $canonicalHost;
 
