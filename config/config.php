@@ -49,7 +49,7 @@ $__local = [
     'DB_DATABASE' => getenv('DB_DATABASE') ?: '',
     'DB_USERNAME' => getenv('DB_USERNAME') ?: '',
     'DB_PASSWORD' => getenv('DB_PASSWORD') ?: '',
-    'DB_URL' => getenv('DATABASE_URL') ?: getenv('DB_URL') ?: '',
+    'DB_URL' => getenv('DATABASE_URL') ?: getenv('DATABASE_PUBLIC_URL') ?: getenv('DB_URL') ?: '',
 ];
 $localFile = APP_ROOT . '/config/config.local.php';
 if (is_file($localFile)) {
