@@ -17,26 +17,26 @@ $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
 
 if ($driver === 'sqlite') {
     $dateFilter = match ($range) {
-        'today' => "created_at >= datetime('now', 'start of day', 'localtime')",
-        'yesterday' => "created_at >= datetime('now', '-1 day', 'start of day', 'localtime') AND created_at < datetime('now', 'start of day', 'localtime')",
-        '7days' => "created_at >= datetime('now', '-7 days', 'localtime')",
-        '30days' => "created_at >= datetime('now', '-30 days', 'localtime')",
+        'today' => "visitor_activity.created_at >= datetime('now', 'start of day', 'localtime')",
+        'yesterday' => "visitor_activity.created_at >= datetime('now', '-1 day', 'start of day', 'localtime') AND visitor_activity.created_at < datetime('now', 'start of day', 'localtime')",
+        '7days' => "visitor_activity.created_at >= datetime('now', '-7 days', 'localtime')",
+        '30days' => "visitor_activity.created_at >= datetime('now', '-30 days', 'localtime')",
         'all' => "1=1",
     };
 } elseif ($driver === 'pgsql') {
     $dateFilter = match ($range) {
-        'today' => "created_at >= date_trunc('day', timezone('Asia/Kolkata', now()))",
-        'yesterday' => "created_at >= date_trunc('day', timezone('Asia/Kolkata', now())) - interval '1 day' AND created_at < date_trunc('day', timezone('Asia/Kolkata', now()))",
-        '7days' => "created_at >= timezone('Asia/Kolkata', now()) - interval '7 days'",
-        '30days' => "created_at >= timezone('Asia/Kolkata', now()) - interval '30 days'",
+        'today' => "visitor_activity.created_at >= date_trunc('day', timezone('Asia/Kolkata', now()))",
+        'yesterday' => "visitor_activity.created_at >= date_trunc('day', timezone('Asia/Kolkata', now())) - interval '1 day' AND visitor_activity.created_at < date_trunc('day', timezone('Asia/Kolkata', now()))",
+        '7days' => "visitor_activity.created_at >= timezone('Asia/Kolkata', now()) - interval '7 days'",
+        '30days' => "visitor_activity.created_at >= timezone('Asia/Kolkata', now()) - interval '30 days'",
         'all' => "1=1",
     };
 } else { // mysql
     $dateFilter = match ($range) {
-        'today' => "created_at >= CURDATE()",
-        'yesterday' => "created_at >= DATE_SUB(CURDATE(), INTERVAL 1 DAY) AND created_at < CURDATE()",
-        '7days' => "created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)",
-        '30days' => "created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)",
+        'today' => "visitor_activity.created_at >= CURDATE()",
+        'yesterday' => "visitor_activity.created_at >= DATE_SUB(CURDATE(), INTERVAL 1 DAY) AND visitor_activity.created_at < CURDATE()",
+        '7days' => "visitor_activity.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)",
+        '30days' => "visitor_activity.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)",
         'all' => "1=1",
     };
 }

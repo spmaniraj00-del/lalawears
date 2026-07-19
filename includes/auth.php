@@ -247,13 +247,21 @@ function login_or_register_google(array $profile): array
     $stmt->execute([$googleId]);
     $user = $stmt->fetch();
 
+    $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+    $nowStr = "datetime('now','localtime')";
+    if ($driver === 'pgsql') {
+        $nowStr = "timezone('Asia/Kolkata', now())";
+    } elseif ($driver === 'mysql') {
+        $nowStr = "NOW()";
+    }
+
     if (!$user) {
         $stmt = $pdo->prepare("SELECT * FROM users WHERE lower(email) = ? AND role = 'user' LIMIT 1");
         $stmt->execute([$email]);
         $user = $stmt->fetch();
         if ($user) {
             $pdo->prepare(
-                "UPDATE users SET google_id = ?, avatar = ?, name = ?, updated_at = datetime('now','localtime') WHERE id = ?"
+                "UPDATE users SET google_id = ?, avatar = ?, name = ?, updated_at = {$nowStr} WHERE id = ?"
             )->execute([$googleId, $avatar, $name, (int) $user['id']]);
         }
     }
@@ -276,7 +284,7 @@ function login_or_register_google(array $profile): array
     } else {
         // Returning Google user — always refresh name + Gmail photo
         $pdo->prepare(
-            "UPDATE users SET avatar = ?, name = ?, email = ?, updated_at = datetime('now','localtime') WHERE id = ?"
+            "UPDATE users SET avatar = ?, name = ?, email = ?, updated_at = {$nowStr} WHERE id = ?"
         )->execute([$avatar, $name, $email, (int) $user['id']]);
         $stmt = $pdo->prepare('SELECT * FROM users WHERE id = ?');
         $stmt->execute([(int) $user['id']]);
@@ -361,6 +369,14 @@ function register_user(string $name, string $phone, string $email, string $passw
     $hash = password_hash($password, PASSWORD_DEFAULT);
 
     try {
+        $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $nowStr = "datetime('now','localtime')";
+        if ($driver === 'pgsql') {
+            $nowStr = "timezone('Asia/Kolkata', now())";
+        } elseif ($driver === 'mysql') {
+            $nowStr = "NOW()";
+        }
+
         $pdo->prepare(
             'INSERT INTO users (name, phone, email, password_hash, role)
              VALUES (?, ?, ?, ?, ?)'

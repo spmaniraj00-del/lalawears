@@ -76,7 +76,7 @@ $pageTitle = 'Pay with UPI QR Code | ' . APP_NAME;
 require __DIR__ . '/../includes/header.php';
 ?>
 
-<main class="checkout-page" style="display:flex; justify-content:center; align-items:center; min-height:80vh; padding:40px 20px;">
+<main class="checkout-page" style="display:flex; justify-content:center; align-items:center; min-height:80vh; padding:40px 20px; margin-top: 80px;">
   <section class="payment-shell" style="background:#fff; width:100%; max-width:480px; padding:30px; border-radius:24px; box-shadow:0 10px 40px rgba(0,0,0,0.05); border:1px solid rgba(0,0,0,0.06); text-align:center;">
     
     <div style="margin-bottom:20px;">
