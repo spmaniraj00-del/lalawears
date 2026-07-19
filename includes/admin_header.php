@@ -26,7 +26,7 @@ $adminSupportUnread = unread_support_count();
     <aside class="admin-sidebar">
       <a class="admin-logo" href="<?= e(url('admin/index.php')) ?>">
         <img src="<?= e(site_logo_url()) ?>" alt="LALA WEARS">
-        <span>lala<em>wears</em><small>.com</small></span>
+        <span>lala<em>wears</em></span>
       </a>
 
       <nav class="admin-menu">

@@ -32,7 +32,7 @@ $searchQuery = trim((string) ($_GET['q'] ?? ''));
 
     <a class="brand" href="<?= e(url('index.php')) ?>#home">
       <img src="<?= e(site_logo_url()) ?>" alt="LALA WEARS logo">
-      <span class="brand-name">LALA<span class="brand-accent">WEARS</span><small>.com</small></span>
+      <span class="brand-name">LALA<span class="brand-accent">WEARS</span></span>
     </a>
 
     <nav class="nav-center" aria-label="Primary">

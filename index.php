@@ -59,7 +59,7 @@ function product_category(array $p): string
         <div class="hero-banner-copy reveal-up">
           <div class="hero-brand-lockup">
             <img class="hero-brand-logo" src="<?= e(site_logo_url()) ?>" alt="">
-            <h1 class="hero-brand-name">lala<span>wears</span><small>.com</small></h1>
+            <h1 class="hero-brand-name">lala<span>wears</span></h1>
           </div>
           <p class="hero-tagline">Best Styles, For Everyone</p>
 

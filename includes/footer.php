@@ -9,7 +9,7 @@
     <div class="footer-inner">
       <a class="footer-brand" href="<?= e(url('index.php')) ?>#home">
         <img src="<?= e(site_logo_url()) ?>" alt="LALA WEARS logo">
-        <span class="footer-brand-name">lala<span>wears</span><small>.com</small></span>
+        <span class="footer-brand-name">lala<span>wears</span></span>
       </a>
 
       <div class="footer-center">
