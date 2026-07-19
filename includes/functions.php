@@ -329,10 +329,10 @@ function setting(string $key, string $default = ''): string
 
 function set_setting(string $key, string $value): void
 {
-    db()->prepare(
-        'INSERT INTO settings (key, value) VALUES (?, ?)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value'
-    )->execute([$key, $value]);
+    $pdo = db();
+    $pdo->prepare('DELETE FROM settings WHERE `key` = ?')->execute([$key]);
+    $pdo->prepare('INSERT INTO settings (`key`, `value`) VALUES (?, ?)')
+        ->execute([$key, $value]);
 }
 
 function site_phone(): string

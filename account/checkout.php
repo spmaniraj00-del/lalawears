@@ -113,9 +113,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             . ($landmark !== '' ? ', Near ' . $landmark : '')
             . ', ' . $city . ', ' . $state . ' - ' . $pincode;
 
-        $payMethod = $_POST['payment_method'] ?? 'upi';
-        if (!in_array($payMethod, ['cod', 'upi'], true)) {
-            $payMethod = 'upi';
+        $payMethod = $_POST['payment_method'] ?? 'qr';
+        if (!in_array($payMethod, ['cod', 'upi', 'qr', 'card'], true)) {
+            $payMethod = 'qr';
         }
 
         $insert = db()->prepare(
@@ -158,7 +158,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $lineTotal = (float) $p['price'] * $qty;
             $grandTotal += $lineTotal;
 
-            $trackMsg = $payMethod === 'upi' ? 'Order placed — awaiting UPI payment' : 'Order placed — Cash on Delivery';
+            $trackMsg = match ($payMethod) {
+                'cod' => 'Order placed — Cash on Delivery',
+                'upi' => 'Order placed — awaiting UPI payment',
+                'qr' => 'Order placed — awaiting QR scan & UTR confirmation',
+                'card' => 'Order placed — awaiting Card payment',
+                default => 'Order placed'
+            };
             add_order_tracking($orderId, 'pending', $trackMsg, $city . ', ' . $state);
 
             notify_user(
@@ -182,11 +188,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash('success', 'Order placed! Your Tracking ID is ' . order_code($orderIds[0]) . '.');
             if ($payMethod === 'upi') {
                 redirect('account/payment.php?id=' . $orderIds[0]);
+            } elseif ($payMethod === 'qr') {
+                redirect('account/qr_pay.php?id=' . $orderIds[0]);
             }
             redirect('account/order_view.php?id=' . $orderIds[0]);
         }
         $codes = implode(', ', array_map('order_code', $orderIds));
         flash('success', count($orderIds) . ' orders placed for ' . money_inr($grandTotal) . '. Tracking IDs: ' . $codes . '.');
+        if ($payMethod === 'qr') {
+            redirect('account/qr_pay.php?ids=' . urlencode(implode(',', $orderIds)));
+        }
         redirect('account/index.php#orders');
     }
 }
@@ -354,37 +365,120 @@ $qtyValue = $single ? $single['qty'] : 0;
       <section class="checkout-card">
         <h2 class="checkout-card-title no-icon">Payment Method</h2>
 
-        <div class="pay-option disabled">
-          <input type="radio" name="payment_method" value="cod" disabled>
-          <span class="pay-icon" style="background: var(--bg-soft); color: var(--text-soft);">
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="12" cy="12" r="2.5"></circle><path d="M6 12h.01M18 12h.01"></path></svg>
-          </span>
-          <span class="pay-body">
-            <span class="pay-name">Cash on Delivery <em class="pay-badge soon">Coming Soon</em></span>
-            <small>Pay when you receive your order</small>
-          </span>
-        </div>
+        <?php
+          $codActive = setting('payment_method_cod', 'coming_soon') === 'active';
+          $upiActive = setting('payment_method_upi', 'coming_soon') === 'active';
+          $qrActive = setting('payment_method_qr', 'coming_soon') === 'active';
+          $cardActive = setting('payment_method_card', 'coming_soon') === 'active';
+          
+          // Determine first checked option
+          $checkedMethod = 'qr'; // Default checked
+          if (!$qrActive) {
+              if ($codActive) $checkedMethod = 'cod';
+              elseif ($upiActive) $checkedMethod = 'upi';
+              elseif ($cardActive) $checkedMethod = 'card';
+          }
+        ?>
 
-        <label class="pay-option selected">
-          <input type="radio" name="payment_method" value="upi" checked>
-          <span class="pay-icon" style="background:#e8f0fe; color:#1a73e8;">
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
-          </span>
-          <span class="pay-body">
-            <span class="pay-name">UPI / QR Code <em class="pay-badge popular" style="background:#1a73e8;">Instant</em></span>
-            <small>Pay instantly via dynamic QR code scanning</small>
-          </span>
-        </label>
+        <!-- COD Option -->
+        <?php if ($codActive): ?>
+          <label class="pay-option <?= $checkedMethod === 'cod' ? 'selected' : '' ?>">
+            <input type="radio" name="payment_method" value="cod" <?= $checkedMethod === 'cod' ? 'checked' : '' ?>>
+            <span class="pay-icon" style="background:#e6f4ea; color:#137333;">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="12" cy="12" r="2.5"></circle><path d="M6 12h.01M18 12h.01"></path></svg>
+            </span>
+            <span class="pay-body">
+              <span class="pay-name">Cash on Delivery <em class="pay-badge instant" style="background:#137333;">Active</em></span>
+              <small>Pay when you receive your order</small>
+            </span>
+          </label>
+        <?php else: ?>
+          <div class="pay-option disabled">
+            <input type="radio" name="payment_method" value="cod" disabled>
+            <span class="pay-icon" style="background: var(--bg-soft); color: var(--text-soft);">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="12" cy="12" r="2.5"></circle><path d="M6 12h.01M18 12h.01"></path></svg>
+            </span>
+            <span class="pay-body">
+              <span class="pay-name">Cash on Delivery <em class="pay-badge soon">Coming Soon</em></span>
+              <small>Pay when you receive your order</small>
+            </span>
+          </div>
+        <?php endif; ?>
 
-        <div class="pay-option disabled">
-          <span class="pay-icon">
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
-          </span>
-          <span class="pay-body">
-            <span class="pay-name">Card Payment <em class="pay-badge soon">CoSoonming </em></span>
-            <small>Visa, Mastercard, RuPay</small>
-          </span>
-        </div>
+        <!-- UPI Option -->
+        <?php if ($upiActive): ?>
+          <label class="pay-option <?= $checkedMethod === 'upi' ? 'selected' : '' ?>">
+            <input type="radio" name="payment_method" value="upi" <?= $checkedMethod === 'upi' ? 'checked' : '' ?>>
+            <span class="pay-icon" style="background:#e8f0fe; color:#1a73e8;">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+            </span>
+            <span class="pay-body">
+              <span class="pay-name">UPI Transfer <em class="pay-badge popular" style="background:#1a73e8;">Active</em></span>
+              <small>Pay instantly via app redirection</small>
+            </span>
+          </label>
+        <?php else: ?>
+          <div class="pay-option disabled">
+            <input type="radio" name="payment_method" value="upi" disabled>
+            <span class="pay-icon" style="background: var(--bg-soft); color: var(--text-soft);">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+            </span>
+            <span class="pay-body">
+              <span class="pay-name">UPI Transfer <em class="pay-badge soon">Coming Soon</em></span>
+              <small>Pay instantly via app redirection</small>
+            </span>
+          </div>
+        <?php endif; ?>
+
+        <!-- Dynamic QR Code Option -->
+        <?php if ($qrActive): ?>
+          <label class="pay-option <?= $checkedMethod === 'qr' ? 'selected' : '' ?>">
+            <input type="radio" name="payment_method" value="qr" <?= $checkedMethod === 'qr' ? 'checked' : '' ?>>
+            <span class="pay-icon" style="background:#fce8e6; color:#c5221f;">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><rect x="7" y="7" width="3" height="3"></rect><rect x="14" y="7" width="3" height="3"></rect><rect x="7" y="14" width="3" height="3"></rect><rect x="14" y="14" width="3" height="3"></rect></svg>
+            </span>
+            <span class="pay-body">
+              <span class="pay-name">UPI / QR Code <em class="pay-badge popular" style="background:#c5221f;">Instant</em></span>
+              <small>Scan QR &amp; Enter UTR code to complete payment</small>
+            </span>
+          </label>
+        <?php else: ?>
+          <div class="pay-option disabled">
+            <input type="radio" name="payment_method" value="qr" disabled>
+            <span class="pay-icon" style="background: var(--bg-soft); color: var(--text-soft);">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><rect x="7" y="7" width="3" height="3"></rect><rect x="14" y="7" width="3" height="3"></rect><rect x="7" y="14" width="3" height="3"></rect><rect x="14" y="14" width="3" height="3"></rect></svg>
+            </span>
+            <span class="pay-body">
+              <span class="pay-name">UPI / QR Code <em class="pay-badge soon">Coming Soon</em></span>
+              <small>Scan QR &amp; Enter UTR code to complete payment</small>
+            </span>
+          </div>
+        <?php endif; ?>
+
+        <!-- Card Payment Option -->
+        <?php if ($cardActive): ?>
+          <label class="pay-option <?= $checkedMethod === 'card' ? 'selected' : '' ?>">
+            <input type="radio" name="payment_method" value="card" <?= $checkedMethod === 'card' ? 'checked' : '' ?>>
+            <span class="pay-icon" style="background:#feebd0; color:#b06000;">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+            </span>
+            <span class="pay-body">
+              <span class="pay-name">Card Payment <em class="pay-badge instant" style="background:#b06000;">Active</em></span>
+              <small>Visa, Mastercard, RuPay</small>
+            </span>
+          </label>
+        <?php else: ?>
+          <div class="pay-option disabled">
+            <input type="radio" name="payment_method" value="card" disabled>
+            <span class="pay-icon" style="background: var(--bg-soft); color: var(--text-soft);">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+            </span>
+            <span class="pay-body">
+              <span class="pay-name">Card Payment <em class="pay-badge soon">Coming Soon</em></span>
+              <small>Visa, Mastercard, RuPay</small>
+            </span>
+          </div>
+        <?php endif; ?>
       </section>
 
       <section class="checkout-card checkout-confirm">

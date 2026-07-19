@@ -188,8 +188,16 @@ require __DIR__ . '/../includes/admin_header.php';
           <div class="detail-row"><span>Price</span><strong><?= e(money_inr($order['price'])) ?></strong></div>
           <div class="detail-row"><span>Qty / Size</span><strong><?= (int) $order['quantity'] ?> · <?= e($order['size']) ?></strong></div>
           <div class="detail-row"><span>Total</span><strong><?= e(money_inr((float) $order['price'] * (int) $order['quantity'])) ?></strong></div>
-          <div class="detail-row"><span>Payment Method</span><strong><?= ($order['payment_method'] ?? 'cod') === 'upi' ? 'UPI / QR Code' : 'Cash on Delivery' ?></strong></div>
-          <?php if (($order['payment_method'] ?? 'cod') === 'upi'): ?>
+          <div class="detail-row"><span>Payment Method</span><strong>
+            <?= match($order['payment_method'] ?? 'cod') {
+                'cod' => 'Cash on Delivery',
+                'upi' => 'UPI Transfer (App)',
+                'qr' => 'Dynamic QR Code',
+                'card' => 'Card Payment',
+                default => ucfirst((string) ($order['payment_method'] ?? 'cod'))
+            } ?>
+          </strong></div>
+          <?php if (in_array(($order['payment_method'] ?? 'cod'), ['upi', 'qr', 'card'], true)): ?>
             <div class="detail-row"><span>Payment Status</span>
               <strong>
                 <?php if ($order['payment_status'] === 'pending'): ?>
@@ -197,14 +205,16 @@ require __DIR__ . '/../includes/admin_header.php';
                 <?php elseif ($order['payment_status'] === 'submitted'): ?>
                   <span style="color:#0d47a1;">Awaiting Verification</span>
                 <?php elseif ($order['payment_status'] === 'paid'): ?>
-                  <span style="color:#2e7d32;">Paid & Verified</span>
+                  <span style="color:#2e7d32;">Paid &amp; Verified</span>
                 <?php elseif ($order['payment_status'] === 'failed'): ?>
                   <span style="color:#c62828;">Rejected (Failed)</span>
                 <?php endif; ?>
               </strong>
             </div>
-            <?php if ($order['transaction_id']): ?>
-              <div class="detail-row"><span>UPI UTR / Ref</span><strong><?= e($order['transaction_id']) ?></strong></div>
+            <?php if ($order['payment_utr']): ?>
+              <div class="detail-row"><span>UTR / Ref</span><strong><?= e($order['payment_utr']) ?></strong></div>
+            <?php elseif ($order['transaction_id']): ?>
+              <div class="detail-row"><span>Ref / Transaction ID</span><strong><?= e($order['transaction_id']) ?></strong></div>
             <?php endif; ?>
           <?php endif; ?>
           <div class="detail-row"><span>Customer</span><strong><?= e($displayName) ?></strong></div>
@@ -243,19 +253,23 @@ require __DIR__ . '/../includes/admin_header.php';
     </div>
 
     <div class="admin-two-col" style="margin-top:36px;">
-        <?php if (($order['payment_method'] ?? 'cod') === 'upi'): ?>
+        <?php if (in_array($order['payment_method'] ?? 'cod', ['upi', 'qr', 'card'], true)): ?>
           <div style="background: #e3f2fd; border: 1.5px solid #90caf9; padding: 20px; border-radius: 16px; margin-bottom: 28px;">
             <h3 style="margin-top:0; font-size:1.2rem; font-weight:800; color:#0d47a1; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-              UPI Gateway Payment Sync
+              Payment Verification
             </h3>
             <p style="font-size: 0.9rem; color: #333; margin: 0 0 16px; line-height: 1.4;">
-              Gateway Transaction ID: <strong style="font-size: 1.05rem; background:#fff; padding:2px 6px; border-radius:4px; border:1px solid rgba(0,0,0,0.1); letter-spacing:0.5px;"><?= e($order['transaction_id'] ?: 'None') ?></strong><br>
+              <?php if ($order['payment_method'] === 'qr'): ?>
+                Submitted UTR / Transaction ID: <strong style="font-size: 1.05rem; background:#fff; padding:2px 6px; border-radius:4px; border:1px solid rgba(0,0,0,0.1); letter-spacing:0.5px;"><?= e($order['payment_utr'] ?: 'None') ?></strong><br>
+              <?php else: ?>
+                Gateway Transaction ID: <strong style="font-size: 1.05rem; background:#fff; padding:2px 6px; border-radius:4px; border:1px solid rgba(0,0,0,0.1); letter-spacing:0.5px;"><?= e($order['transaction_id'] ?: 'None') ?></strong><br>
+              <?php endif; ?>
               Payment Status: <strong style="text-transform:uppercase; color:#0d47a1;"><?= e($order['payment_status']) ?></strong>
             </p>
             
             <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
-              <?php if ($order['transaction_id']): ?>
+              <?php if ($order['payment_method'] === 'upi' && $order['transaction_id']): ?>
                 <form method="post" style="flex:1; min-width:140px;">
                   <?= csrf_field() ?>
                   <input type="hidden" name="action" value="check_payment_status">
@@ -270,12 +284,12 @@ require __DIR__ . '/../includes/admin_header.php';
                 <form method="post" style="flex:1; min-width:140px;">
                   <?= csrf_field() ?>
                   <input type="hidden" name="action" value="approve_payment">
-                  <button type="submit" class="btn-admin-primary" style="width:100%; justify-content:center; background:#2e7d32; border:none; color:#fff; padding:10px; border-radius:8px; font-weight:700; cursor:pointer;">Manual Approve</button>
+                  <button type="submit" class="btn-admin-primary" style="width:100%; justify-content:center; background:#2e7d32; border:none; color:#fff; padding:10px; border-radius:8px; font-weight:700; cursor:pointer;">Approve Payment</button>
                 </form>
                 <form method="post" style="flex:1; min-width:140px;">
                   <?= csrf_field() ?>
                   <input type="hidden" name="action" value="reject_payment">
-                  <button type="submit" class="btn-admin-outline" style="width:100%; justify-content:center; border:1px solid #c62828; color:#c62828; background:none; padding:10px; border-radius:8px; font-weight:700; cursor:pointer;">Manual Reject</button>
+                  <button type="submit" class="btn-admin-outline" style="width:100%; justify-content:center; border:1px solid #c62828; color:#c62828; background:none; padding:10px; border-radius:8px; font-weight:700; cursor:pointer;">Reject Payment</button>
                 </form>
               <?php endif; ?>
             </div>

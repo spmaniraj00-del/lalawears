@@ -25,6 +25,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             set_setting($key, $val);
         }
 
+        // Payment status toggles
+        set_setting('payment_method_cod', isset($_POST['payment_method_cod']) ? 'active' : 'coming_soon');
+        set_setting('payment_method_upi', isset($_POST['payment_method_upi']) ? 'active' : 'coming_soon');
+        set_setting('payment_method_qr', isset($_POST['payment_method_qr']) ? 'active' : 'coming_soon');
+        set_setting('payment_method_card', isset($_POST['payment_method_card']) ? 'active' : 'coming_soon');
+
         // Branding uploads
         if (!empty($_FILES['site_logo']['name'])) {
             $uploaded = safe_upload_image($_FILES['site_logo'], 'logo');
@@ -136,6 +142,31 @@ $currentFounder = setting('founder_photo', '');
         <input type="url" id="youtube_url" name="youtube_url" maxlength="300"
                placeholder="https://youtube.com/@yourchannel" value="<?= e(site_youtube()) ?>">
       </div>
+    </div>
+  </div>
+
+  <div class="admin-card">
+    <div class="admin-card-head">
+      <h2 class="admin-card-title"><span style="display:inline-block;width:4px;height:18px;border-radius:99px;background:var(--green);"></span> Checkout Payment Options</h2>
+    </div>
+    <p style="font-size: 13px; color: var(--text-soft); margin: -10px 0 20px 20px;">Toggle which payment methods are active on the checkout page. Inactive ones display as "Coming Soon".</p>
+    <div style="padding: 0 20px 20px 20px; display: flex; flex-direction: column; gap: 15px;">
+      <label style="display: flex; align-items: center; gap: 10px; font-weight: 600; cursor: pointer;">
+        <input type="checkbox" name="payment_method_cod" value="1" <?= setting('payment_method_cod', 'coming_soon') === 'active' ? 'checked' : '' ?>>
+        <span>Cash on Delivery (COD)</span>
+      </label>
+      <label style="display: flex; align-items: center; gap: 10px; font-weight: 600; cursor: pointer;">
+        <input type="checkbox" name="payment_method_upi" value="1" <?= setting('payment_method_upi', 'coming_soon') === 'active' ? 'checked' : '' ?>>
+        <span>UPI Transfer (App Redirect / Manual)</span>
+      </label>
+      <label style="display: flex; align-items: center; gap: 10px; font-weight: 600; cursor: pointer;">
+        <input type="checkbox" name="payment_method_qr" value="1" <?= setting('payment_method_qr', 'coming_soon') === 'active' ? 'checked' : '' ?>>
+        <span>Dynamic QR Code (Instant Scan & UTR Verification)</span>
+      </label>
+      <label style="display: flex; align-items: center; gap: 10px; font-weight: 600; cursor: pointer;">
+        <input type="checkbox" name="payment_method_card" value="1" <?= setting('payment_method_card', 'coming_soon') === 'active' ? 'checked' : '' ?>>
+        <span>Card Payment (Visa, Mastercard, RuPay)</span>
+      </label>
     </div>
   </div>
 
