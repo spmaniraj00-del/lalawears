@@ -12,7 +12,7 @@ return [
     'TERMINALX_CREATE_URL' => 'https://terminalx999.space/api/create-order',
     'TERMINALX_STATUS_URL' => 'https://terminalx999.space/api/check-order-status',
     'OTP_SHOW_ON_SITE' => false,
-    'APP_URL' => 'https://www.lalawearscraftedforstyle.com',
+    'APP_URL' => 'https://lalawearscraftedforstyle.com',
     'RECAPTCHA_SITE_KEY' => '',
     'RECAPTCHA_SECRET_KEY' => '',
 ];

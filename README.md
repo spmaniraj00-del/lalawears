@@ -28,7 +28,7 @@ Important:
 
 Your live URL is:
 
-**`https://www.lalawearscraftedforstyle.com`**
+**`https://lalawearscraftedforstyle.com`**
 
 GoDaddy root domains often fail as a plain CNAME. Use **www** as the main site.
 
@@ -55,11 +55,11 @@ Cloudflare SSL/TLS:
 Rules → Redirect Rules → create:
 
 - If hostname equals `lalawearscraftedforstyle.com`
-- Then dynamic redirect to `https://www.lalawearscraftedforstyle.com/${uri}`
+- Then dynamic redirect to `https://lalawearscraftedforstyle.com/${uri}`
 - Status **301**
 
 #### 4) App / Railway variables
-- `APP_URL` = `https://www.lalawearscraftedforstyle.com`
+- `APP_URL` = `https://lalawearscraftedforstyle.com`
 - `FORCE_HTTPS` = `1`
 - `FORCE_CANONICAL_HOST` = `1` (redirects bare domain → www)
 - `TERMINALX_TOKEN` = payment API token (keep secret; rotate if exposed)
@@ -73,7 +73,7 @@ Railway → your service → **Variables** → add:
 |----------|----------------|
 | `RESEND_API_KEY` | From [resend.com/api-keys](https://resend.com/api-keys) (starts with `re_`) |
 | `RESEND_FROM` | `onboarding@resend.dev` (same as earlier working emails) |
-| `APP_URL` | `https://www.lalawearscraftedforstyle.com` |
+| `APP_URL` | `https://lalawearscraftedforstyle.com` |
 
 Then **Redeploy**.
 
@@ -90,16 +90,16 @@ Railway **Variables** (required or the Google button stays hidden):
 |----------|--------|
 | `GOOGLE_CLIENT_ID` | from Google Cloud Console |
 | `GOOGLE_CLIENT_SECRET` | from Google Cloud Console |
-| `APP_URL` | `https://www.lalawearscraftedforstyle.com` |
+| `APP_URL` | `https://lalawearscraftedforstyle.com` |
 
 In [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → OAuth client:
 
-- **Authorized JavaScript origins:** `https://www.lalawearscraftedforstyle.com`
-- **Authorized redirect URIs:** `https://www.lalawearscraftedforstyle.com/auth/google_callback.php`
+- **Authorized JavaScript origins:** `https://lalawearscraftedforstyle.com`
+- **Authorized redirect URIs:** `https://lalawearscraftedforstyle.com/auth/google_callback.php`
 
 After login, Gmail name + profile photo show in the header, account page, and reviews.
 
-Open the site only as **`https://www.lalawearscraftedforstyle.com`**.
+Open the site only as **`https://lalawearscraftedforstyle.com`**.
 
 ## Customer login
 
