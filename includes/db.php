@@ -159,6 +159,23 @@ function init_schema(PDO $pdo): void
         $text = 'VARCHAR(255)';
         $real = 'DECIMAL(10,2)';
         $now = "timezone('Asia/Kolkata', now())";
+
+        // Define SQLite-like datetime() function in PostgreSQL for compatibility
+        $pdo->exec("
+            CREATE OR REPLACE FUNCTION datetime(val1 text) 
+            RETURNS timestamp AS $$
+            BEGIN
+                RETURN timezone('Asia/Kolkata', now());
+            END;
+            $$ LANGUAGE plpgsql;
+
+            CREATE OR REPLACE FUNCTION datetime(val1 text, val2 text) 
+            RETURNS timestamp AS $$
+            BEGIN
+                RETURN timezone('Asia/Kolkata', now());
+            END;
+            $$ LANGUAGE plpgsql;
+        ");
     }
 
     $longText = ($driver === 'sqlite') ? 'TEXT' : 'TEXT';
