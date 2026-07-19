@@ -41,7 +41,7 @@ ob_start();
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6zm9 14H6V10h12v10zm-6-3c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z"/></svg>
         </div>
         <h1>Forgot Password</h1>
-        <p class="otp-sub">Enter the Gmail linked to your account. We’ll email a reset link — and also show it on this page if delivery fails.</p>
+        <p class="otp-sub">Enter the email address linked to your account. We’ll email you a reset link — and also show it on this page if delivery fails.</p>
 
         <?php if ($error): ?>
           <div class="otp-error"><?= e($error) ?></div>
@@ -65,7 +65,7 @@ ob_start();
           <div class="otp-form-group">
             <label for="email">Email Address</label>
             <input type="email" id="email" name="email" required maxlength="120"
-                   placeholder="you@gmail.com" value="<?= e($email) ?>">
+                   placeholder="you@example.com" value="<?= e($email) ?>">
           </div>
           <button type="submit" class="otp-btn" style="margin-top: 24px;">
             Send Reset Link

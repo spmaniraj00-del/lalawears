@@ -60,7 +60,7 @@ ob_start();
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm6-9h-1V6a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zM9 6a3 3 0 1 1 6 0v2H9V6z"/></svg>
         </div>
         <h1>Sign In</h1>
-        <p class="otp-sub">Login with Google (Gmail) — your name &amp; photo come with you.</p>
+        <p class="otp-sub">Sign in to manage your orders, tracking, and profile.</p>
 
         <?php if ($error): ?>
           <div class="otp-error"><?= e($error) ?></div>
@@ -83,10 +83,10 @@ ob_start();
             </svg>
             Continue with Google
           </a>
-          <p class="otp-google-hint">Uses your Gmail · photo &amp; name sync automatically</p>
+          <p class="otp-google-hint">Sign in securely using your Google account</p>
 
           <div class="otp-divider">
-            <span class="otp-divider-text">Or sign in with email</span>
+            <span class="otp-divider-text">Or sign in with email and password</span>
             <div class="otp-divider-line"></div>
           </div>
         <?php else: ?>

@@ -421,7 +421,7 @@ function send_password_reset_link(string $email): array
     if (!$user) {
         return [
             'ok' => false,
-            'error' => 'No customer account found with this email. Use the same Gmail you registered / signed in with.',
+            'error' => 'No customer account found with this email. Please check your spelling or use the email you registered with.',
         ];
     }
 

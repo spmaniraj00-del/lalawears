@@ -60,7 +60,7 @@ ob_start();
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
         </div>
         <h1>Sign Up</h1>
-        <p class="otp-sub">Fastest way: continue with Google — Gmail photo &amp; name sync automatically.</p>
+        <p class="otp-sub">Create an account to track orders and save your wishlist.</p>
 
         <?php if ($error): ?>
           <div class="otp-error"><?= e($error) ?></div>
@@ -76,10 +76,10 @@ ob_start();
             </svg>
             Continue with Google
           </a>
-          <p class="otp-google-hint">One tap · Gmail photo shows in your profile</p>
+          <p class="otp-google-hint">Sign up using your Google account</p>
 
           <div class="otp-divider">
-            <span class="otp-divider-text">Or create with email</span>
+            <span class="otp-divider-text">Or register with your details</span>
             <div class="otp-divider-line"></div>
           </div>
         <?php endif; ?>
