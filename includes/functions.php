@@ -189,15 +189,25 @@ function clear_login_attempts(PDO $pdo, string $identifier): void
 
 function is_login_locked(PDO $pdo, string $identifier): bool
 {
-    $stmt = $pdo->prepare(
-        "SELECT COUNT(*) FROM login_attempts
-         WHERE identifier = ?
-           AND attempted_at > datetime('now', 'localtime', ?) "
-    );
-    $stmt->execute([
-        strtolower($identifier),
-        '-' . LOGIN_LOCK_MINUTES . ' minutes',
-    ]);
+    $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+    $minutes = (int) LOGIN_LOCK_MINUTES;
+
+    if ($driver === 'pgsql') {
+        $sql = "SELECT COUNT(*) FROM login_attempts 
+                WHERE identifier = ? 
+                  AND attempted_at > timezone('Asia/Kolkata', now()) - interval '{$minutes} minutes'";
+    } elseif ($driver === 'mysql') {
+        $sql = "SELECT COUNT(*) FROM login_attempts 
+                WHERE identifier = ? 
+                  AND attempted_at > DATE_SUB(NOW(), INTERVAL {$minutes} MINUTE)";
+    } else { // sqlite
+        $sql = "SELECT COUNT(*) FROM login_attempts
+                WHERE identifier = ?
+                  AND attempted_at > datetime('now', 'localtime', '-{$minutes} minutes')";
+    }
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([strtolower($identifier)]);
     return (int) $stmt->fetchColumn() >= LOGIN_MAX_ATTEMPTS;
 }
 
