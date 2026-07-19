@@ -137,7 +137,40 @@ function ensure_upload_dir(): void
 
 function client_ip(): string
 {
-    return $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    return $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+}
+
+function log_visitor_activity(): void
+{
+    if (PHP_SAPI === 'cli') {
+        return;
+    }
+    
+    // Skip static asset loads or admin ajax status syncs if necessary, but tracking all frontend hits
+    $url = $_SERVER['REQUEST_URI'] ?? '/';
+    if (preg_match('/\.(js|css|png|jpg|jpeg|gif|webp|svg|ico)$/i', $url)) {
+        return;
+    }
+
+    try {
+        $pdo = db();
+        $ip = client_ip();
+        $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        $sessId = session_id();
+        
+        $userId = null;
+        if (isset($_SESSION['user_id'])) {
+            $userId = (int) $_SESSION['user_id'];
+        }
+        
+        $stmt = $pdo->prepare(
+            'INSERT INTO visitor_activity (ip_address, user_agent, page_url, user_id, session_id)
+             VALUES (?, ?, ?, ?, ?)'
+        );
+        $stmt->execute([$ip, $ua, $url, $userId, $sessId]);
+    } catch (Throwable $e) {
+        // Fail silently so a database glitch doesn't take down the website
+    }
 }
 
 function record_login_attempt(PDO $pdo, string $identifier): void
@@ -314,8 +347,8 @@ function all_settings(): array
     static $cache = null;
     if ($cache === null) {
         $cache = [];
-        foreach (db()->query('SELECT key, value FROM settings') as $row) {
-            $cache[$row['key']] = $row['value'];
+        foreach (db()->query('SELECT key_name, val_value FROM settings') as $row) {
+            $cache[$row['key_name']] = $row['val_value'];
         }
     }
     return $cache;
@@ -330,8 +363,8 @@ function setting(string $key, string $default = ''): string
 function set_setting(string $key, string $value): void
 {
     $pdo = db();
-    $pdo->prepare('DELETE FROM settings WHERE `key` = ?')->execute([$key]);
-    $pdo->prepare('INSERT INTO settings (`key`, `value`) VALUES (?, ?)')
+    $pdo->prepare('DELETE FROM settings WHERE key_name = ?')->execute([$key]);
+    $pdo->prepare('INSERT INTO settings (key_name, val_value) VALUES (?, ?)')
         ->execute([$key, $value]);
 }
 

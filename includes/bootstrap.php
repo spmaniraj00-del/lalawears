@@ -21,3 +21,4 @@ run_firewall();
 
 set_security_headers();
 db(); // ensure DB ready
+log_visitor_activity(); // record page view activity

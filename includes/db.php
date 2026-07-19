@@ -244,8 +244,20 @@ function init_schema(PDO $pdo): void
 
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS settings (
-            `key` {$text} PRIMARY KEY,
-            `value` {$longText} NOT NULL
+            key_name {$text} PRIMARY KEY,
+            val_value {$longText} NOT NULL
+        );
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS visitor_activity (
+            id {$ai},
+            ip_address {$text} NOT NULL,
+            user_agent {$longText} DEFAULT '',
+            page_url {$longText} NOT NULL,
+            user_id INT DEFAULT NULL,
+            session_id {$text} DEFAULT '',
+            created_at TIMESTAMP NOT NULL DEFAULT {$now}
         );
     ");
 }
