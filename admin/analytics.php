@@ -12,34 +12,36 @@ if (!in_array($range, $allowedRanges, true)) {
     $range = 'today';
 }
 
-$dateFilter = "";
-$driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
-
-if ($driver === 'sqlite') {
-    $dateFilter = match ($range) {
-        'today' => "visitor_activity.created_at >= datetime('now', 'start of day', 'localtime')",
-        'yesterday' => "visitor_activity.created_at >= datetime('now', '-1 day', 'start of day', 'localtime') AND visitor_activity.created_at < datetime('now', 'start of day', 'localtime')",
-        '7days' => "visitor_activity.created_at >= datetime('now', '-7 days', 'localtime')",
-        '30days' => "visitor_activity.created_at >= datetime('now', '-30 days', 'localtime')",
-        'all' => "1=1",
-    };
-} elseif ($driver === 'pgsql') {
-    $dateFilter = match ($range) {
-        'today' => "visitor_activity.created_at >= date_trunc('day', timezone('Asia/Kolkata', now()))",
-        'yesterday' => "visitor_activity.created_at >= date_trunc('day', timezone('Asia/Kolkata', now())) - interval '1 day' AND visitor_activity.created_at < date_trunc('day', timezone('Asia/Kolkata', now()))",
-        '7days' => "visitor_activity.created_at >= timezone('Asia/Kolkata', now()) - interval '7 days'",
-        '30days' => "visitor_activity.created_at >= timezone('Asia/Kolkata', now()) - interval '30 days'",
-        'all' => "1=1",
-    };
-} else { // mysql
-    $dateFilter = match ($range) {
-        'today' => "visitor_activity.created_at >= CURDATE()",
-        'yesterday' => "visitor_activity.created_at >= DATE_SUB(CURDATE(), INTERVAL 1 DAY) AND visitor_activity.created_at < CURDATE()",
-        '7days' => "visitor_activity.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)",
-        '30days' => "visitor_activity.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)",
-        'all' => "1=1",
-    };
+function get_date_filter(string $driver, string $range, string $column): string {
+    if ($driver === 'sqlite') {
+        return match ($range) {
+            'today' => "{$column} >= datetime('now', 'start of day', 'localtime')",
+            'yesterday' => "{$column} >= datetime('now', '-1 day', 'start of day', 'localtime') AND {$column} < datetime('now', 'start of day', 'localtime')",
+            '7days' => "{$column} >= datetime('now', '-7 days', 'localtime')",
+            '30days' => "{$column} >= datetime('now', '-30 days', 'localtime')",
+            'all' => "1=1",
+        };
+    } elseif ($driver === 'pgsql') {
+        return match ($range) {
+            'today' => "{$column} >= date_trunc('day', timezone('Asia/Kolkata', now()))",
+            'yesterday' => "{$column} >= date_trunc('day', timezone('Asia/Kolkata', now())) - interval '1 day' AND {$column} < date_trunc('day', timezone('Asia/Kolkata', now()))",
+            '7days' => "{$column} >= timezone('Asia/Kolkata', now()) - interval '7 days'",
+            '30days' => "{$column} >= timezone('Asia/Kolkata', now()) - interval '30 days'",
+            'all' => "1=1",
+        };
+    } else { // mysql
+        return match ($range) {
+            'today' => "{$column} >= CURDATE()",
+            'yesterday' => "{$column} >= DATE_SUB(CURDATE(), INTERVAL 1 DAY) AND {$column} < CURDATE()",
+            '7days' => "{$column} >= DATE_SUB(NOW(), INTERVAL 7 DAY)",
+            '30days' => "{$column} >= DATE_SUB(NOW(), INTERVAL 30 DAY)",
+            'all' => "1=1",
+        };
+    }
 }
+
+$driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+$dateFilter = get_date_filter($driver, $range, "visitor_activity.created_at");
 
 // 1. Core aggregates
 $totalHits = (int) $pdo->query("SELECT COUNT(*) FROM visitor_activity WHERE $dateFilter")->fetchColumn();
@@ -73,11 +75,12 @@ foreach ($platformRows as $row) {
 }
 
 // 4. Activity log
+$activityDateFilter = get_date_filter($driver, $range, "a.created_at");
 $recentActivity = $pdo->query(
     "SELECT a.*, u.name AS user_name, u.email AS user_email 
      FROM visitor_activity a 
      LEFT JOIN users u ON u.id = a.user_id 
-     WHERE $dateFilter 
+     WHERE $activityDateFilter 
      ORDER BY a.id DESC 
      LIMIT 50"
 )->fetchAll();
